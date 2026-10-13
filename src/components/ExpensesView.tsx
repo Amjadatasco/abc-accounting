@@ -271,12 +271,16 @@ export const ExpensesView: React.FC = () => {
             <span className="stat-title" style={{ fontWeight: 800 }}>المجموع الإجمالي العام</span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{baseFilteredExpenses.length} سند</span>
           </div>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0284c7' }}>
-              $ {totalUSD.toLocaleString()}
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المجموع الموحد:</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0284c7' }}>
+                $ {Math.round(totalUnifiedUSD).toLocaleString()}
+              </span>
             </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-              {totalSYP.toLocaleString()} ل.س
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem' }}>
+              <span>بالدولار: <strong>$ {totalUSD.toLocaleString()}</strong></span>
+              <span>بالسوري: <strong>{totalSYP.toLocaleString()} ل.س</strong></span>
             </div>
           </div>
         </div>
@@ -296,12 +300,16 @@ export const ExpensesView: React.FC = () => {
             <span className="stat-title" style={{ fontWeight: 800 }}>🏢 مصاريف شركة ABC</span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{abcExpenses.length} سند</span>
           </div>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#334155' }}>
-              $ {abcUSD.toLocaleString()}
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المجموع الموحد:</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#334155' }}>
+                $ {Math.round(abcUnifiedUSD).toLocaleString()}
+              </span>
             </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-muted)' }}>
-              {abcSYP.toLocaleString()} ل.س
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem' }}>
+              <span>بالدولار: <strong>$ {abcUSD.toLocaleString()}</strong></span>
+              <span>بالسوري: <strong>{abcSYP.toLocaleString()} ل.س</strong></span>
             </div>
           </div>
         </div>
@@ -321,12 +329,16 @@ export const ExpensesView: React.FC = () => {
             <span className="stat-title" style={{ fontWeight: 800, color: '#1d4ed8' }}>👤 مصاريف أمجد</span>
             <span style={{ fontSize: '0.75rem', color: '#2563eb' }}>{amjadExpenses.length} سند</span>
           </div>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#2563eb' }}>
-              $ {amjadUSD.toLocaleString()}
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المجموع الموحد:</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#2563eb' }}>
+                $ {Math.round(amjadUnifiedUSD).toLocaleString()}
+              </span>
             </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#1d4ed8' }}>
-              {amjadSYP.toLocaleString()} ل.س
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem' }}>
+              <span>بالدولار: <strong>$ {amjadUSD.toLocaleString()}</strong></span>
+              <span>بالسوري: <strong>{amjadSYP.toLocaleString()} ل.س</strong> <span style={{ color: '#16a34a' }}>($ {Math.round(amjadSYP / 130).toLocaleString()})</span></span>
             </div>
           </div>
         </div>
@@ -346,12 +358,16 @@ export const ExpensesView: React.FC = () => {
             <span className="stat-title" style={{ fontWeight: 800, color: '#7e22ce' }}>👤 مصاريف نور</span>
             <span style={{ fontSize: '0.75rem', color: '#9333ea' }}>{nourExpenses.length} سند</span>
           </div>
-          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#9333ea' }}>
-              $ {nourUSD.toLocaleString()}
+          <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المجموع الموحد:</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9333ea' }}>
+                $ {Math.round(nourUnifiedUSD).toLocaleString()}
+              </span>
             </div>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#7e22ce' }}>
-              {nourSYP.toLocaleString()} ل.س
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem' }}>
+              <span>بالدولار: <strong>$ {nourUSD.toLocaleString()}</strong></span>
+              <span>بالسوري: <strong>{nourSYP.toLocaleString()} ل.س</strong></span>
             </div>
           </div>
         </div>
