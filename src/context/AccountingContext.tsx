@@ -84,7 +84,7 @@ interface AccountingContextType {
 
 const AccountingContext = createContext<AccountingContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'abc_accounting_erp_data_v1';
+const STORAGE_KEY = 'abc_accounting_erp_data_v2';
 
 export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [accounts, setAccounts] = useState<Account[]>(() => {
