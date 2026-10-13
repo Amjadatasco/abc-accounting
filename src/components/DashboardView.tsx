@@ -35,6 +35,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
+      {/* Red Test Banner */}
+      <div style={{
+        textAlign: 'center',
+        padding: '1.5rem',
+        margin: '1.5rem 0',
+        backgroundColor: '#fee2e2',
+        border: '3px dashed #ef4444',
+        borderRadius: '12px'
+      }}>
+        <h1 style={{
+          color: '#dc2626',
+          fontSize: '3.5rem',
+          fontWeight: 900,
+          margin: 0,
+          letterSpacing: '2px'
+        }}>
+          تجربة
+        </h1>
+      </div>
+
       {/* Main KPI Stats Grid */}
       <div className="stats-grid">
         <div className="stat-card" style={{ borderRight: '4px solid var(--primary-color)' }}>
