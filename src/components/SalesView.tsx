@@ -1,0 +1,787 @@
+import React, { useState } from 'react';
+import { useAccounting } from '../context/AccountingContext';
+import type { Invoice, Currency } from '../types/accounting';
+import { InvoicePrintModal } from './InvoicePrintModal';
+
+interface SalesViewProps {
+  onOpenNewInvoiceModal?: () => void;
+}
+
+export const SalesView: React.FC<SalesViewProps> = () => {
+  const { invoices, contacts, addInvoice, markInvoicePaid, deleteInvoice, addContact } = useAccounting();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCurrency, setFilterCurrency] = useState<'all' | 'USD' | 'SYP'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'service' | 'product'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
+
+  // New Sale Form
+  const [saleType, setSaleType] = useState<'service' | 'product'>('service');
+  const [currency, setCurrency] = useState<Currency>('USD');
+  const [customerName, setCustomerName] = useState('');
+  const [itemDescription, setItemDescription] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unitPrice, setUnitPrice] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'sham_cash' | 'cash' | 'bank' | 'credit'>('sham_cash');
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('paid');
+  const [partialAmount, setPartialAmount] = useState('');
+  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
+
+  const currSym = currency === 'SYP' ? 'ل.س' : '$';
+
+  // Preset services & products for fast 1-click selection
+  const servicePresets = [
+    'طباعة كتب ومجلات',
+    'طباعة بروشورات وفلايرات',
+    'كروت عمل شخصية (Business Cards)',
+    'تصميم هوية بصرية وشعار',
+    'طباعة لافتة رول اب (Rollup)',
+    'طباعة ستيكرات وليبل وتغليف',
+    'خدمات تصوير وتوثيق'
+  ];
+
+  const productPresets = [
+    'رول ورق كوشيه فاخر',
+    'كرتون ورق تصوير A4',
+    'أحبار طباعة ليزرية',
+    'دفاتر وسجلات فواتير جاهزة',
+    'علب كرتونية وتغليف جاهز'
+  ];
+
+  const customers = contacts.filter(c => c.type === 'customer' || c.type === 'both');
+
+  const computedTotal = (parseFloat(quantity) || 0) * (parseFloat(unitPrice) || 0);
+
+  const handleSubmit = (e: React.FormEvent, printImmediately = false) => {
+    e.preventDefault();
+    const custTrimmed = customerName.trim();
+    const itemTrimmed = itemDescription.trim();
+    const priceNum = parseFloat(unitPrice) || 0;
+    const qtyNum = parseFloat(quantity) || 1;
+
+    if (!custTrimmed) {
+      alert('يرجى تحديد أو كتابة اسم العميل');
+      return;
+    }
+    if (!itemTrimmed) {
+      alert('يرجى كتابة أو اختيار بيان الخدمة أو المنتج المباع');
+      return;
+    }
+    if (priceNum <= 0) {
+      alert('يرجى إدخال سعر صحيح أكبر من الصفر');
+      return;
+    }
+
+    // Auto-save customer if new
+    const existingCust = contacts.find(c => c.name.trim().toLowerCase() === custTrimmed.toLowerCase());
+    const finalCustomerId = existingCust?.id || `cnt_${Date.now()}`;
+
+    if (!existingCust) {
+      addContact({
+        name: custTrimmed,
+        type: 'customer',
+        phone: 'غير مسجل',
+        balance: 0,
+        currency,
+        currencySymbol: currSym
+      });
+    }
+
+    const totalAmount = qtyNum * priceNum;
+    let paidAmount = 0;
+    let finalStatus: 'paid' | 'partial' | 'unpaid' = 'paid';
+
+    if (paymentMethod === 'credit') {
+      finalStatus = 'unpaid';
+      paidAmount = 0;
+    } else if (paymentStatus === 'paid') {
+      finalStatus = 'paid';
+      paidAmount = totalAmount;
+    } else if (paymentStatus === 'unpaid') {
+      finalStatus = 'unpaid';
+      paidAmount = 0;
+    } else {
+      finalStatus = 'partial';
+      paidAmount = parseFloat(partialAmount) || 0;
+    }
+
+    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+
+    const newSaleData: Omit<Invoice, 'id' | 'createdAt'> = {
+      invoiceNumber,
+      customerId: finalCustomerId,
+      customerName: custTrimmed,
+      date: saleDate,
+      dueDate: saleDate,
+      items: [
+        {
+          id: `item_${Date.now()}`,
+          description: itemTrimmed,
+          quantity: qtyNum,
+          unitPrice: priceNum,
+          taxRate: 0,
+          total: totalAmount
+        }
+      ],
+      subtotal: totalAmount,
+      taxAmount: 0,
+      totalAmount,
+      currency,
+      currencySymbol: currSym,
+      saleType,
+      paymentMethod,
+      status: finalStatus,
+      paidAmount,
+      notes: notes || (saleType === 'service' ? `تقديم خدمة: ${itemTrimmed}` : `بيع منتج: ${itemTrimmed}`)
+    };
+
+    addInvoice(newSaleData);
+
+    if (printImmediately) {
+      setPrintingInvoice({
+        ...newSaleData,
+        id: `inv_${Date.now()}`,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    // Reset Form
+    setCustomerName('');
+    setItemDescription('');
+    setQuantity('1');
+    setUnitPrice('');
+    setPartialAmount('');
+    setNotes('');
+    setIsModalOpen(false);
+  };
+
+  // Filter Sales list
+  const filteredSales = invoices.filter(inv => {
+    const matchesSearch = inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          inv.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          inv.items.some(it => it.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                          (inv.notes && inv.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesCurrency = filterCurrency === 'all' || (inv.currency || 'USD') === filterCurrency;
+    const matchesType = filterType === 'all' || (inv.saleType || 'service') === filterType;
+    const matchesStatus = filterStatus === 'all' || 
+                          (filterStatus === 'paid' && inv.status === 'paid') ||
+                          (filterStatus === 'unpaid' && inv.status !== 'paid');
+    const matchesDate = (!filterStartDate || inv.date >= filterStartDate) && (!filterEndDate || inv.date <= filterEndDate);
+
+    return matchesSearch && matchesCurrency && matchesType && matchesStatus && matchesDate;
+  });
+
+  // KPI Calculations
+  const salesUSD = invoices.filter(i => (i.currency || 'USD') === 'USD');
+  const salesSYP = invoices.filter(i => (i.currency || 'USD') === 'SYP');
+
+  const totalUSD = salesUSD.reduce((s, i) => s + i.totalAmount, 0);
+  const paidUSD = salesUSD.reduce((s, i) => s + i.paidAmount, 0);
+  const unpaidUSD = totalUSD - paidUSD;
+
+  const totalSYP = salesSYP.reduce((s, i) => s + i.totalAmount, 0);
+  const paidSYP = salesSYP.reduce((s, i) => s + i.paidAmount, 0);
+  const unpaidSYP = totalSYP - paidSYP;
+
+  return (
+    <div>
+      {/* Top Header */}
+      <div className="top-header">
+        <div className="page-title">
+          <h2>سجل المبيعات والخدمات (Sales & Services)</h2>
+          <p>تسجيل مبيعات الخدمات والمنتجات اليومية بسهولة وسرعة مع إدارة التحصيل الفوري والآجل</p>
+        </div>
+        <div className="header-actions">
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ padding: '0.65rem 1.25rem', fontSize: '0.95rem', fontWeight: 800 }}>
+            <span>+</span> تسجيل بيع خدمة أو منتج جديد
+          </button>
+        </div>
+      </div>
+
+      {/* Main KPI Stats Row */}
+      <div className="stats-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+        <div className="stat-card" style={{ borderRight: '4px solid #2563eb' }}>
+          <div className="stat-header">
+            <span className="stat-title">إجمالي المبيعات بالدولار</span>
+            <span className="badge badge-blue">💵 USD ($)</span>
+          </div>
+          <div className="stat-value" style={{ color: '#2563eb' }}>
+            $ {totalUSD.toLocaleString()}
+          </div>
+          <div className="stat-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--success-color)' }}>المحصل: $ {paidUSD.toLocaleString()}</span>
+            {unpaidUSD > 0 && <span style={{ color: 'var(--danger-color)' }}>آجل: $ {unpaidUSD.toLocaleString()}</span>}
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderRight: '4px solid #16a34a' }}>
+          <div className="stat-header">
+            <span className="stat-title">إجمالي المبيعات بالليرة السورية</span>
+            <span className="badge badge-green">🇸🇾 SYP (ل.س)</span>
+          </div>
+          <div className="stat-value" style={{ color: '#16a34a' }}>
+            {totalSYP.toLocaleString()} <span style={{ fontSize: '1rem' }}>ل.س</span>
+          </div>
+          <div className="stat-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'var(--success-color)' }}>المحصل: {paidSYP.toLocaleString()} ل.س</span>
+            {unpaidSYP > 0 && <span style={{ color: 'var(--danger-color)' }}>آجل: {unpaidSYP.toLocaleString()} ل.س</span>}
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderRight: '4px solid #64748b' }}>
+          <div className="stat-header">
+            <span className="stat-title">عدد العمليات المسجلة</span>
+            <span className="badge badge-gray">{invoices.length} عملية</span>
+          </div>
+          <div className="stat-value" style={{ color: 'var(--text-dark)' }}>
+            {invoices.length} <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>مبيعات</span>
+          </div>
+          <div className="stat-footer">
+            <span>تشمل مبيعات الخدمات والمنتجات للعملاء</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Search Panel */}
+      <div className="table-card" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          
+          {/* Filters Group */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {/* Currency Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>العملة:</span>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button 
+                  className={`btn btn-sm ${filterCurrency === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterCurrency('all')}
+                >
+                  الكل
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterCurrency === 'USD' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterCurrency('USD')}
+                >
+                  💵 دولار
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterCurrency === 'SYP' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterCurrency('SYP')}
+                >
+                  🇸🇾 سوري
+                </button>
+              </div>
+            </div>
+
+            {/* Type Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>النوع:</span>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button 
+                  className={`btn btn-sm ${filterType === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterType('all')}
+                >
+                  الكل
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterType === 'service' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterType('service')}
+                >
+                  🛠️ خدمات
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterType === 'product' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterType('product')}
+                >
+                  📦 منتجات
+                </button>
+              </div>
+            </div>
+
+            {/* Status Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>السداد:</span>
+              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                <button 
+                  className={`btn btn-sm ${filterStatus === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterStatus('all')}
+                >
+                  الكل
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterStatus === 'paid' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterStatus('paid')}
+                >
+                  مسدد ✓
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterStatus === 'unpaid' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterStatus('unpaid')}
+                >
+                  آجل (ديون)
+                </button>
+              </div>
+            </div>
+
+            {/* Date Range */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>من:</span>
+              <input 
+                type="date" 
+                className="form-input" 
+                style={{ width: '130px', padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                value={filterStartDate}
+                onChange={(e) => setFilterStartDate(e.target.value)}
+              />
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>إلى:</span>
+              <input 
+                type="date" 
+                className="form-input" 
+                style={{ width: '130px', padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                value={filterEndDate}
+                onChange={(e) => setFilterEndDate(e.target.value)}
+              />
+              {(filterStartDate || filterEndDate || filterCurrency !== 'all' || filterType !== 'all' || filterStatus !== 'all') && (
+                <button 
+                  className="btn btn-sm btn-outline" 
+                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                  onClick={() => {
+                    setFilterStartDate('');
+                    setFilterEndDate('');
+                    setFilterCurrency('all');
+                    setFilterType('all');
+                    setFilterStatus('all');
+                  }}
+                >
+                  ✕ مسح الفلتر
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Search Box */}
+          <div style={{ width: '260px' }}>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="بحث بالعميل، الخدمة، المنتج..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Sales Records Table */}
+      <div className="table-card">
+        <div className="table-header">
+          <h3>سجل المبيعات والخدمات ({filteredSales.length})</h3>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            يتم تحديث الأرصدة والحسابات المحاسبية تلقائياً مع كل عملية بيع
+          </span>
+        </div>
+        <div className="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: '120px' }}>رقم العملية</th>
+                <th style={{ width: '100px' }}>التاريخ</th>
+                <th style={{ width: '90px', textAlign: 'center' }}>النوع</th>
+                <th>الخدمة / المنتج المباع</th>
+                <th>العميل</th>
+                <th>طريقة الدفع</th>
+                <th style={{ textAlign: 'center', width: '100px' }}>العملة</th>
+                <th style={{ textAlign: 'left', width: '130px' }}>المبلغ الإجمالي</th>
+                <th style={{ textAlign: 'center', width: '110px' }}>حالة السداد</th>
+                <th style={{ textAlign: 'center', width: '130px' }}>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSales.length === 0 ? (
+                <tr>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    لا توجد عمليات مبيعات مطابقة لمعايير البحث. انقر على "+ تسجيل بيع خدمة أو منتج جديد" لإضافة مبيعات جديدة.
+                  </td>
+                </tr>
+              ) : (
+                filteredSales.map(sale => {
+                  const saleSym = sale.currencySymbol || (sale.currency === 'SYP' ? 'ل.س' : '$');
+                  const isSyp = sale.currency === 'SYP';
+                  const remaining = sale.totalAmount - sale.paidAmount;
+                  const firstItem = sale.items[0]?.description || sale.notes || 'خدمة مبيعات';
+
+                  return (
+                    <tr key={sale.id}>
+                      <td style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
+                        {sale.invoiceNumber}
+                      </td>
+                      <td style={{ fontSize: '0.85rem' }}>{sale.date}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className={`badge ${sale.saleType === 'product' ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '0.75rem' }}>
+                          {sale.saleType === 'product' ? '📦 منتج' : '🛠️ خدمة'}
+                        </span>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>
+                        {firstItem}
+                        {sale.items.length > 1 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginRight: '0.3rem' }}>+{sale.items.length - 1} بنود</span>}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{sale.customerName}</td>
+                      <td>
+                        <span style={{ fontSize: '0.85rem' }}>
+                          {sale.paymentMethod === 'sham_cash' ? '📱 شام كاش' :
+                           sale.paymentMethod === 'cash' ? '💵 كاش (صندوق)' :
+                           sale.paymentMethod === 'bank' ? '🏦 تحويل بنكي' : '📋 آجل (دين)'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="badge" style={{ backgroundColor: isSyp ? '#f0fdf4' : '#eff6ff', color: isSyp ? '#166534' : '#1e40af', border: `1px solid ${isSyp ? '#bbf7d0' : '#bfdbfe'}`, fontSize: '0.75rem', fontWeight: 700 }}>
+                          {isSyp ? '🇸🇾 سوري' : '💵 دولار'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'left', fontWeight: 800 }}>
+                        {saleSym} {sale.totalAmount.toLocaleString()}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className={`badge ${sale.status === 'paid' ? 'badge-green' : sale.status === 'partial' ? 'badge-orange' : 'badge-red'}`}>
+                          {sale.status === 'paid' ? 'مسددة ✓' : sale.status === 'partial' ? 'مسدد جزئياً' : 'معلقة (آجل)'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            title="طباعة إيصال / فاتورة"
+                            onClick={() => setPrintingInvoice(sale)}
+                          >
+                            🖨️
+                          </button>
+                          {remaining > 0 && (
+                            <button 
+                              className="btn btn-sm btn-primary" 
+                              title="تسجيل سداد وتحصيل"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                              onClick={() => {
+                                if (confirm(`هل تريد تأكيد سداد المبلغ المتبقي (${saleSym} ${remaining.toLocaleString()}) للعميل ${sale.customerName}؟`)) {
+                                  markInvoicePaid(sale.id);
+                                }
+                              }}
+                            >
+                              سداد
+                            </button>
+                          )}
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            style={{ color: 'var(--danger-color)', borderColor: '#fecaca', padding: '0.2rem 0.45rem' }}
+                            title="حذف"
+                            onClick={() => {
+                              if (confirm(`هل أنت متأكد من حذف عملية البيع ${sale.invoiceNumber}؟`)) {
+                                deleteInvoice(sale.id);
+                              }
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Quick Sale Registration Modal */}
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content modal-lg" style={{ maxWidth: '780px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.4rem' }}>🛒</span>
+                <div>
+                  <h3 style={{ margin: 0 }}>تسجيل عملية بيع جديدة (خدمة أو منتج)</h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>إدخال سريع وسلس مع الحفظ الفوري للعميل والحسابات</p>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setIsModalOpen(false)}>×</button>
+            </div>
+
+            <form onSubmit={(e) => handleSubmit(e, false)}>
+              <div className="modal-body">
+                
+                {/* 1. Currency Selection Bar */}
+                <div style={{ marginBottom: '1.25rem', padding: '0.85rem 1.15rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div>
+                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-dark)', display: 'block' }}>
+                      عملة البيع والتحصيل:
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      حدد عملة تسعير هذه العملية
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${currency === 'USD' ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '0.5rem 1.25rem', fontWeight: 800, fontSize: '0.9rem' }}
+                      onClick={() => setCurrency('USD')}
+                    >
+                      💵 دولار أمريكي ($)
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${currency === 'SYP' ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '0.5rem 1.25rem', fontWeight: 800, fontSize: '0.9rem' }}
+                      onClick={() => setCurrency('SYP')}
+                    >
+                      🇸🇾 ليرة سورية (ل.س)
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Sale Type Toggle */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label className="form-label" style={{ fontWeight: 800 }}>نوع البيع:</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className={`btn ${saleType === 'service' ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                      onClick={() => setSaleType('service')}
+                    >
+                      <span>🛠️</span> تقديم خدمة (طباعة / تصميم / تنفيذ)
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn ${saleType === 'product' ? 'btn-primary' : 'btn-outline'}`}
+                      style={{ padding: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                      onClick={() => setSaleType('product')}
+                    >
+                      <span>📦</span> بيع منتج جاهز (ورق / أحبار / رول / كروت)
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3. Customer & Date Row */}
+                <div className="form-row">
+                  <div className="form-group" style={{ flex: 2 }}>
+                    <label className="form-label">العميل المستفيد (اكتب الاسم أو اختره) *</label>
+                    <input 
+                      type="text" 
+                      list="sales-customers-datalist" 
+                      className="form-input" 
+                      required 
+                      placeholder="اكتب اسم العميل (يُحفظ تلقائياً في دليل العملاء)..." 
+                      value={customerName} 
+                      onChange={(e) => setCustomerName(e.target.value)} 
+                    />
+                    <datalist id="sales-customers-datalist">
+                      {customers.map(c => (
+                        <option key={c.id} value={c.name} />
+                      ))}
+                    </datalist>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      ✨ اكتب أي اسم عميل جديد وسيتم حفظه فوراً في قائمة العملاء.
+                    </span>
+                  </div>
+
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label className="form-label">تاريخ العملية *</label>
+                    <input 
+                      type="date" 
+                      className="form-input" 
+                      required 
+                      value={saleDate} 
+                      onChange={(e) => setSaleDate(e.target.value)} 
+                    />
+                  </div>
+                </div>
+
+                {/* 4. Item Description with Quick Presets */}
+                <div className="form-group">
+                  <label className="form-label">
+                    {saleType === 'service' ? 'بيان الخدمة المقدمة للعميل *' : 'بيان الصنف أو المنتج المباع *'}
+                  </label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    required 
+                    placeholder={saleType === 'service' ? 'مثال: طباعة 1000 بروشور مطوي وجهين، تصميم شعار...' : 'مثال: 5 كراتين ورق تصوير A4، رول بنر 80 جرام...'}
+                    value={itemDescription} 
+                    onChange={(e) => setItemDescription(e.target.value)} 
+                  />
+
+                  {/* Fast 1-Click Preset Buttons */}
+                  <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>اختيارات سريعة:</span>
+                    {(saleType === 'service' ? servicePresets : productPresets).map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        className="btn btn-sm btn-outline"
+                        style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '15px' }}
+                        onClick={() => setItemDescription(preset)}
+                      >
+                        + {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 5. Quantity, Price, & Live Total */}
+                <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
+                  <div className="form-row" style={{ alignItems: 'flex-end', marginBottom: 0 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">الكمية *</label>
+                      <input 
+                        type="number" 
+                        min="1" 
+                        step="any"
+                        className="form-input" 
+                        required 
+                        value={quantity} 
+                        onChange={(e) => setQuantity(e.target.value)}
+                        style={{ textAlign: 'center', fontWeight: 700 }}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">السعر الفردي ({currSym}) *</label>
+                      <input 
+                        type="number" 
+                        step="any" 
+                        min="0.01"
+                        className="form-input" 
+                        required 
+                        placeholder="0.00"
+                        value={unitPrice} 
+                        onChange={(e) => setUnitPrice(e.target.value)}
+                        style={{ fontWeight: 800 }}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: 0, textAlign: 'left' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>المبلغ الإجمالي النهائي:</span>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary-color)' }}>
+                        {currSym} {computedTotal.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 6. Payment Method & Status */}
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">طريقة استلام المبلغ (التحصيل) *</label>
+                    <select 
+                      className="form-select" 
+                      value={paymentMethod} 
+                      onChange={(e) => {
+                        const val = e.target.value as any;
+                        setPaymentMethod(val);
+                        if (val === 'credit') {
+                          setPaymentStatus('unpaid');
+                        } else if (paymentStatus === 'unpaid') {
+                          setPaymentStatus('paid');
+                        }
+                      }}
+                    >
+                      <option value="sham_cash">📱 محفظة شام كاش (Sham Cash)</option>
+                      <option value="cash">💵 نقداً كاش (صندوق الخزينة)</option>
+                      <option value="bank">🏦 تحويل بنكي (حساب جاري)</option>
+                      <option value="credit">📋 بيع آجل (دين على ذمة العميل)</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">حالة استلام الدفعة *</label>
+                    <select 
+                      className="form-select" 
+                      value={paymentStatus} 
+                      onChange={(e) => setPaymentStatus(e.target.value as any)}
+                      disabled={paymentMethod === 'credit'}
+                    >
+                      <option value="paid">✓ تم استلام المبلغ بالكامل فوراً</option>
+                      <option value="partial">⚖️ تم استلام دفعة جزئية (مقدمة)</option>
+                      <option value="unpaid">⏳ لم يُستلم بعد (آجل بالكامل)</option>
+                    </select>
+                  </div>
+
+                  {paymentStatus === 'partial' && paymentMethod !== 'credit' && (
+                    <div className="form-group">
+                      <label className="form-label">المبلغ المستلم فعلياً ({currSym}) *</label>
+                      <input 
+                        type="number" 
+                        step="any"
+                        className="form-input" 
+                        required 
+                        placeholder="0.00"
+                        value={partialAmount} 
+                        onChange={(e) => setPartialAmount(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 7. Notes */}
+                <div className="form-group">
+                  <label className="form-label">ملاحظات إضافية (شروط تسليم، تفاصيل المقاس أو اللون...)</label>
+                  <textarea 
+                    className="form-textarea" 
+                    rows={2} 
+                    placeholder="أي تعليمات إضافية عن العملية..."
+                    value={notes} 
+                    onChange={(e) => setNotes(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)}>
+                  إلغاء
+                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button 
+                    type="button" 
+                    className="btn btn-outline"
+                    onClick={(e) => handleSubmit(e, true)}
+                    style={{ fontWeight: 700 }}
+                  >
+                    🖨️ حفظ وطباعة الفاتورة
+                  </button>
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem', fontWeight: 800 }}>
+                    💾 حفظ عملية البيع فورا
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Print Modal */}
+      {printingInvoice && (
+        <InvoicePrintModal 
+          invoice={printingInvoice} 
+          onClose={() => setPrintingInvoice(null)} 
+        />
+      )}
+    </div>
+  );
+};
