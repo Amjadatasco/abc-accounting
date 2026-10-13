@@ -12,10 +12,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenNewInvoice, 
   onOpenNewJournal 
 }) => {
-  const { metrics, invoices, journalEntries, companySettings, markInvoicePaid } = useAccounting();
+  const { metrics, invoices, expenses, journalEntries, companySettings, markInvoicePaid } = useAccounting();
   const curr = companySettings.currencySymbol || '$';
 
   const unpaidInvoices = invoices.filter(inv => inv.status !== 'paid');
+
+  // Compute live actual metrics from registered invoices & expenses
+  const actualRevenue = invoices.reduce((sum, inv) => {
+    return sum + (Number(inv.totalAmount) || 0);
+  }, 0);
+
+  // Unified expenses in USD (converting SYP at transaction rate e.g. 130 or 14800)
+  const actualExpensesUSD = expenses.reduce((sum, exp) => {
+    if ((exp.currency || 'USD') === 'USD') return sum + (Number(exp.amount) || 0);
+    const rate = exp.exchangeRate || 130;
+    return sum + (rate > 0 ? (Number(exp.amount) || 0) / rate : 0);
+  }, 0);
+
+  const actualExpensesSYP = expenses
+    .filter(exp => (exp.currency || 'USD') === 'SYP')
+    .reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
+
+  const amjadTotalUSD = expenses
+    .filter(exp => exp.paidBy === 'amjad')
+    .reduce((sum, exp) => {
+      if ((exp.currency || 'USD') === 'USD') return sum + (Number(exp.amount) || 0);
+      const rate = exp.exchangeRate || 130;
+      return sum + (rate > 0 ? (Number(exp.amount) || 0) / rate : 0);
+    }, 0);
+
+  const nourTotalUSD = expenses
+    .filter(exp => exp.paidBy === 'nour')
+    .reduce((sum, exp) => {
+      if ((exp.currency || 'USD') === 'USD') return sum + (Number(exp.amount) || 0);
+      const rate = exp.exchangeRate || 130;
+      return sum + (rate > 0 ? (Number(exp.amount) || 0) / rate : 0);
+    }, 0);
+
+  const netProfit = actualRevenue - actualExpensesUSD;
 
   return (
     <div>
@@ -40,55 +74,53 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="stats-grid">
         <div className="stat-card" style={{ borderRight: '4px solid var(--primary-color)' }}>
           <div className="stat-header">
-            <span className="stat-title">إجمالي الإيرادات</span>
-            <span className="badge badge-blue">السنة المالية</span>
+            <span className="stat-title">إجمالي الإيرادات والمبيعات</span>
+            <span className="badge badge-blue">سنة 2026</span>
           </div>
           <div className="stat-value" style={{ color: 'var(--primary-color)' }}>
-            {curr} {metrics.totalRevenue.toLocaleString()}
+            {curr} {actualRevenue.toLocaleString()}
           </div>
           <div className="stat-footer">
-            <span>مبيعات وخدمات محققة</span>
+            <span>{invoices.length} عمليات بيع مسجلة</span>
           </div>
         </div>
 
         <div className="stat-card" style={{ borderRight: '4px solid var(--warning-color)' }}>
           <div className="stat-header">
-            <span className="stat-title">إجمالي المصروفات</span>
-            <span className="badge badge-orange">مصاريف وتشغيل</span>
+            <span className="stat-title">إجمالي المصروفات والتجهيزات</span>
+            <span className="badge badge-orange">{expenses.length} سندات</span>
           </div>
           <div className="stat-value" style={{ color: 'var(--text-dark)' }}>
-            {curr} {metrics.totalExpenses.toLocaleString()}
+            {curr} {Math.round(actualExpensesUSD).toLocaleString()}
           </div>
           <div className="stat-footer">
-            <span>تكاليف تشغيلية ورواتب ومشتريات</span>
+            <span>{actualExpensesSYP > 0 ? `منها ${actualExpensesSYP.toLocaleString()} ل.س` : 'تكاليف تشغيلية وتأسيس'}</span>
           </div>
         </div>
 
-        <div className="stat-card" style={{ borderRight: `4px solid ${metrics.netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)'}` }}>
+        <div className="stat-card" style={{ borderRight: '4px solid #2563eb' }}>
           <div className="stat-header">
-            <span className="stat-title">صافي الربح التقديري</span>
-            <span className={`badge ${metrics.netProfit >= 0 ? 'badge-green' : 'badge-red'}`}>
-              {metrics.netProfit >= 0 ? 'أرباح نشاط' : 'عجز مالي'}
-            </span>
+            <span className="stat-title">👤 مستحقات الشريك أمجد</span>
+            <span className="badge badge-blue">مصاريف مدفوعة</span>
           </div>
-          <div className="stat-value" style={{ color: metrics.netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
-            {curr} {metrics.netProfit.toLocaleString()}
+          <div className="stat-value" style={{ color: '#2563eb' }}>
+            {curr} {Math.round(amjadTotalUSD).toLocaleString()}
           </div>
           <div className="stat-footer">
-            <span>هامش الربح: {metrics.totalRevenue > 0 ? ((metrics.netProfit / metrics.totalRevenue) * 100).toFixed(1) : 0}%</span>
+            <span>6,200 $ + 123,950 ل.س (953 $)</span>
           </div>
         </div>
 
-        <div className="stat-card" style={{ borderRight: '4px solid #06b6d4' }}>
+        <div className="stat-card" style={{ borderRight: '4px solid #9333ea' }}>
           <div className="stat-header">
-            <span className="stat-title">السيولة النقدية (البنوك والصندوق)</span>
-            <span className="badge badge-blue">رصيد متاح</span>
+            <span className="stat-title">👤 مستحقات الشريك نور</span>
+            <span className="badge" style={{ backgroundColor: '#faf5ff', color: '#9333ea', border: '1px solid #e9d5ff' }}>مصاريف مدفوعة</span>
           </div>
-          <div className="stat-value" style={{ color: '#0891b2' }}>
-            {curr} {metrics.cashAndBank.toLocaleString()}
+          <div className="stat-value" style={{ color: '#9333ea' }}>
+            {curr} {Math.round(nourTotalUSD).toLocaleString()}
           </div>
           <div className="stat-footer">
-            <span>أموال متوفرة في الحسابات الجارية</span>
+            <span>ماكينات + تجهيز المحل</span>
           </div>
         </div>
       </div>
@@ -97,16 +129,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="stats-grid" style={{ marginBottom: '2rem' }}>
         <div className="stat-card" style={{ backgroundColor: '#fcfdfd' }}>
           <div className="stat-header">
-            <span className="stat-title">مستحقات على العملاء (الذمم المدينة)</span>
-            <span className="badge badge-orange">{unpaidInvoices.length} فواتير</span>
+            <span className="stat-title">صافي نتيجة النشاط</span>
+            <span className={`badge ${netProfit >= 0 ? 'badge-green' : 'badge-red'}`}>
+              {netProfit >= 0 ? 'فائض أرباح' : 'عجز مرحلة تأسيس'}
+            </span>
           </div>
-          <div className="stat-value" style={{ fontSize: '1.45rem', color: '#b45309' }}>
-            {curr} {metrics.accountsReceivable.toLocaleString()}
+          <div className="stat-value" style={{ fontSize: '1.45rem', color: netProfit >= 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
+            {curr} {Math.round(netProfit).toLocaleString()}
           </div>
           <div className="stat-footer">
-            <a href="#invoices" onClick={(e) => { e.preventDefault(); onNavigate('invoices'); }} style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
-              متابعة فواتير التحصيل ←
-            </a>
+            <span>{netProfit < 0 ? 'مصاريف تجهيز وتأسيس مبدئية' : 'صافي ربح محقق'}</span>
           </div>
         </div>
 
@@ -158,17 +190,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Responsive Bar Chart Simulation */}
+        {/* Responsive Bar Chart Simulation based on actual 2026 data */}
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: 180, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
           {[
-            { month: 'مايو', rev: 28000, exp: 19000 },
-            { month: 'يونيو', rev: 35000, exp: 22000 },
-            { month: 'يوليو', rev: 32000, exp: 20000 },
-            { month: 'أغسطس', rev: 41000, exp: 26000 },
-            { month: 'سبتمبر', rev: metrics.totalRevenue, exp: metrics.totalExpenses },
+            { 
+              month: 'يناير 2026', 
+              rev: invoices.filter(i => i.date?.startsWith('2026-01')).reduce((s, i) => s + (Number(i.totalAmount) || 0), 0), 
+              exp: expenses.filter(e => e.date?.startsWith('2026-01')).reduce((s, e) => {
+                if ((e.currency || 'USD') === 'USD') return s + (Number(e.amount) || 0);
+                const rate = e.exchangeRate || 130;
+                return s + (rate > 0 ? (Number(e.amount) || 0) / rate : 0);
+              }, 0) 
+            },
+            { 
+              month: 'فبراير 2026', 
+              rev: invoices.filter(i => i.date?.startsWith('2026-02')).reduce((s, i) => s + (Number(i.totalAmount) || 0), 0), 
+              exp: expenses.filter(e => e.date?.startsWith('2026-02')).reduce((s, e) => {
+                if ((e.currency || 'USD') === 'USD') return s + (Number(e.amount) || 0);
+                const rate = e.exchangeRate || 130;
+                return s + (rate > 0 ? (Number(e.amount) || 0) / rate : 0);
+              }, 0) 
+            },
+            { 
+              month: 'مارس 2026', 
+              rev: invoices.filter(i => i.date?.startsWith('2026-03')).reduce((s, i) => s + (Number(i.totalAmount) || 0), 0), 
+              exp: expenses.filter(e => e.date?.startsWith('2026-03')).reduce((s, e) => {
+                if ((e.currency || 'USD') === 'USD') return s + (Number(e.amount) || 0);
+                const rate = e.exchangeRate || 130;
+                return s + (rate > 0 ? (Number(e.amount) || 0) / rate : 0);
+              }, 0) 
+            },
+            { 
+              month: 'إجمالي التأسيس', 
+              rev: actualRevenue, 
+              exp: actualExpensesUSD 
+            },
           ].map((bar, idx) => {
-            const maxVal = Math.max(metrics.totalRevenue, 50000);
-            const revHeight = Math.min(150, Math.max(20, (bar.rev / maxVal) * 150));
+            const maxVal = Math.max(actualExpensesUSD, actualRevenue, 1000);
+            const revHeight = Math.min(150, Math.max(10, (bar.rev / maxVal) * 150));
             const expHeight = Math.min(150, Math.max(15, (bar.exp / maxVal) * 150));
 
             return (
