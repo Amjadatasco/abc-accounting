@@ -12,6 +12,7 @@ export const ExpensesView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
 
   // Form
   const [expenseCurrency, setExpenseCurrency] = useState<Currency>('USD');
@@ -92,11 +93,23 @@ export const ExpensesView: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Base date and search filter
+  // Base date and search filter (Search by billNumber, vendorName, notes, amount, or equivalent)
   const baseFilteredExpenses = expenses.filter(exp => {
-    const matchesSearch = exp.billNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exp.vendorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (exp.notes && exp.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) {
+      const matchesDate = (!filterStartDate || exp.date >= filterStartDate) && (!filterEndDate || exp.date <= filterEndDate);
+      return matchesDate;
+    }
+
+    const matchesText = exp.billNumber.toLowerCase().includes(term) ||
+      exp.vendorName.toLowerCase().includes(term) ||
+      (exp.notes && exp.notes.toLowerCase().includes(term));
+
+    // Support searching by exact or partial price/amount (e.g. 500, 6200, 15000, 7400)
+    const matchesAmount = String(exp.amount).includes(term) ||
+      (exp.equivalentAmount && String(Math.round(exp.equivalentAmount)).includes(term));
+
+    const matchesSearch = matchesText || matchesAmount;
     const matchesDate = (!filterStartDate || exp.date >= filterStartDate) && (!filterEndDate || exp.date <= filterEndDate);
     return matchesSearch && matchesDate;
   });
@@ -140,14 +153,32 @@ export const ExpensesView: React.FC = () => {
   const nourUnifiedUSD = nourExpenses.reduce((s, e) => s + getUnifiedUSD(e), 0);
   const nourUnifiedSYP = nourExpenses.reduce((s, e) => s + getUnifiedSYP(e), 0);
 
-  // Active table list
-  const displayExpenses = activeTab === 'abc' 
+  // Active table list with Sorting
+  const rawList = activeTab === 'abc' 
     ? abcExpenses 
     : activeTab === 'amjad' 
     ? amjadExpenses 
     : activeTab === 'nour' 
     ? nourExpenses 
     : baseFilteredExpenses;
+
+  const displayExpenses = [...rawList].sort((a, b) => {
+    if (sortBy === 'newest') {
+      const dateDiff = new Date(b.date).getTime() - new Date(a.date).getTime();
+      return dateDiff !== 0 ? dateDiff : b.billNumber.localeCompare(a.billNumber);
+    }
+    if (sortBy === 'oldest') {
+      const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      return dateDiff !== 0 ? dateDiff : a.billNumber.localeCompare(b.billNumber);
+    }
+    if (sortBy === 'highest') {
+      return getUnifiedUSD(b) - getUnifiedUSD(a);
+    }
+    if (sortBy === 'lowest') {
+      return getUnifiedUSD(a) - getUnifiedUSD(b);
+    }
+    return 0;
+  });
 
   const getPayerBadge = (payer?: ExpensePayer) => {
     switch (payer) {
@@ -656,9 +687,10 @@ export const ExpensesView: React.FC = () => {
       )}
 
       {/* Filter and Search */}
-      <div className="table-card no-print" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="table-card no-print" style={{ padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.85rem' }}>
           
+          {/* Date Range Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>من:</span>
             <input 
@@ -687,14 +719,56 @@ export const ExpensesView: React.FC = () => {
             )}
           </div>
 
-          <div style={{ width: '280px' }}>
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="بحث برقم السند، المورد، البيان..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          {/* Sorting & Search Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', flex: '1', justifyContent: 'flex-end', minWidth: '280px' }}>
+            {/* Sort Dropdown */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>الترتيب:</span>
+              <select 
+                className="form-select"
+                style={{ width: 'auto', minWidth: '150px', padding: '0.35rem 0.65rem', fontSize: '0.82rem', fontWeight: 600 }}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+              >
+                <option value="newest">🕒 الأحدث أولاً</option>
+                <option value="oldest">🕰️ الأقدم أولاً</option>
+                <option value="highest">💰 الأعلى سعراً</option>
+                <option value="lowest">🏷️ الأقل سعراً</option>
+              </select>
+            </div>
+
+            {/* Search Input */}
+            <div style={{ flex: '1', minWidth: '220px', maxWidth: '340px', position: 'relative' }}>
+              <input 
+                type="text" 
+                className="form-input" 
+                placeholder="🔍 بحث بالاسم، البيان، أو السعر..."
+                style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  style={{
+                    position: 'absolute',
+                    left: '8px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    fontSize: '0.85rem',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '2px 6px'
+                  }}
+                  title="مسح البحث"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
