@@ -14,6 +14,7 @@ const MainApp = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'sales' | 'invoices' | 'expenses' | 'contacts' | 'journal' | 'accounts' | 'reports' | 'settings'>('dashboard');
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { companySettings, invoices, journalEntries, isCloudEnabled } = useAccounting();
   const unpaidCount = invoices.filter(i => i.status !== 'paid').length;
@@ -30,10 +31,49 @@ const MainApp = () => {
     { id: 'settings', label: 'إعدادات المنشأة', icon: '⚙️' }
   ];
 
+  const handleNavClick = (tabId: any) => {
+    setActiveTab(tabId);
+    setIsMobileMenuOpen(false); // Close sidebar automatically on mobile selection
+  };
+
   return (
     <div className="app-container">
+      {/* Mobile Top Header */}
+      <header className="mobile-topbar no-print">
+        <button 
+          className="mobile-menu-btn" 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          aria-label="القائمة الرئيسية"
+        >
+          {isMobileMenuOpen ? '✕' : '☰'}
+        </button>
+
+        <div className="mobile-brand">
+          <img 
+            src={companySettings.logoUrl || '/abc_logo.jpg'} 
+            alt="ABC Logo" 
+            className="mobile-logo" 
+          />
+          <span className="mobile-title">محاسب ABC</span>
+        </div>
+
+        <div className="mobile-status-dot" title={isCloudEnabled ? 'سحابي متصل' : 'محلي'}>
+          <span className={`status-pill ${isCloudEnabled ? 'online' : 'offline'}`}>
+            {isCloudEnabled ? '🟢' : '⚪'}
+          </span>
+        </div>
+      </header>
+
+      {/* Mobile Overlay Backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          className="mobile-backdrop no-print" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="sidebar no-print">
+      <aside className={`sidebar no-print ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
           <img 
             src={companySettings.logoUrl || '/abc_logo.jpg'} 
@@ -72,7 +112,7 @@ const MainApp = () => {
             <div
               key={item.id}
               className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(item.id as any)}
+              onClick={() => handleNavClick(item.id)}
             >
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <span className="nav-item-icon">{item.icon}</span>
@@ -91,7 +131,7 @@ const MainApp = () => {
           <button 
             className="btn btn-primary" 
             style={{ width: '100%', padding: '0.65rem', fontSize: '0.85rem', fontWeight: 800 }}
-            onClick={() => setActiveTab('sales')}
+            onClick={() => handleNavClick('sales')}
           >
             🛒 + تسجيل بيع جديد
           </button>
@@ -99,7 +139,7 @@ const MainApp = () => {
             className="btn btn-outline" 
             style={{ width: '100%', padding: '0.45rem', fontSize: '0.75rem' }}
             onClick={() => {
-              setActiveTab('invoices');
+              handleNavClick('invoices');
               setIsInvoiceModalOpen(true);
             }}
           >
