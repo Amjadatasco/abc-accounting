@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useAccounting } from '../context/AccountingContext';
-import type { Currency, ExpensePayer } from '../types/accounting';
+import type { Currency, ExpensePayer, ExpenseBill } from '../types/accounting';
 
 export const ExpensesView: React.FC = () => {
-  const { expenses, accounts, contacts, addExpense, deleteExpense, addContact } = useAccounting();
+  const { expenses, accounts, contacts, addExpense, updateExpense, deleteExpense, addContact } = useAccounting();
 
   // Sub-pages / Tabs
   const [activeTab, setActiveTab] = useState<'all' | 'abc' | 'amjad' | 'nour' | 'reconciliation'>('all');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<ExpenseBill | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -55,34 +56,55 @@ export const ExpensesView: React.FC = () => {
       });
     }
 
-    const billNumber = `EXP-2026-${String(expenses.length + 1).padStart(3, '0')}`;
     const finalAmount = parseFloat(amount) || 0;
     const finalRate = parseFloat(exchangeRate) || 14800;
     const finalEquivalent = expenseCurrency === 'USD'
       ? finalAmount * finalRate
       : finalRate > 0 ? finalAmount / finalRate : 0;
 
-    addExpense({
-      billNumber,
-      vendorId: finalVendorId,
-      vendorName: nameTrimmed,
-      accountId,
-      date,
-      amount: finalAmount,
-      taxAmount: parseFloat(taxAmount) || 0,
-      currency: expenseCurrency,
-      currencySymbol: expCurrSym,
-      exchangeRate: finalRate,
-      equivalentAmount: finalEquivalent,
-      paymentMethod,
-      paidBy,
-      status,
-      notes
-    });
+    if (editingExpense) {
+      updateExpense({
+        ...editingExpense,
+        vendorId: finalVendorId,
+        vendorName: nameTrimmed,
+        accountId,
+        date,
+        amount: finalAmount,
+        taxAmount: parseFloat(taxAmount) || 0,
+        currency: expenseCurrency,
+        currencySymbol: expCurrSym,
+        exchangeRate: finalRate,
+        equivalentAmount: finalEquivalent,
+        paymentMethod,
+        paidBy,
+        status,
+        notes
+      });
+    } else {
+      const billNumber = `EXP-2026-${String(expenses.length + 1).padStart(3, '0')}`;
+      addExpense({
+        billNumber,
+        vendorId: finalVendorId,
+        vendorName: nameTrimmed,
+        accountId,
+        date,
+        amount: finalAmount,
+        taxAmount: parseFloat(taxAmount) || 0,
+        currency: expenseCurrency,
+        currencySymbol: expCurrSym,
+        exchangeRate: finalRate,
+        equivalentAmount: finalEquivalent,
+        paymentMethod,
+        paidBy,
+        status,
+        notes
+      });
+    }
 
     localStorage.setItem('last_dollar_rate', String(finalRate));
 
     // Reset
+    setEditingExpense(null);
     setExpenseCurrency('USD');
     setPaidBy('abc');
     setVendorName('');
@@ -205,15 +227,39 @@ export const ExpensesView: React.FC = () => {
   };
 
   const openAddExpenseModal = () => {
+    setEditingExpense(null);
+    setExpenseCurrency('USD');
     if (activeTab === 'amjad') {
       setPaidBy('amjad');
     } else if (activeTab === 'nour') {
       setPaidBy('nour');
-    } else if (activeTab === 'abc') {
-      setPaidBy('abc');
     } else {
       setPaidBy('abc');
     }
+    setVendorName('');
+    setAccountId('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setAmount('');
+    setTaxAmount('0');
+    setPaymentMethod('sham_cash');
+    setStatus('paid');
+    setNotes('');
+    setIsModalOpen(true);
+  };
+
+  const handleEditExpense = (exp: ExpenseBill) => {
+    setEditingExpense(exp);
+    setExpenseCurrency(exp.currency || 'USD');
+    setPaidBy(exp.paidBy || 'abc');
+    setExchangeRate(String(exp.exchangeRate || 14800));
+    setVendorName(exp.vendorName || '');
+    setAccountId(exp.accountId || '');
+    setDate(exp.date || new Date().toISOString().split('T')[0]);
+    setAmount(String(exp.amount || ''));
+    setTaxAmount(String(exp.taxAmount || 0));
+    setPaymentMethod(exp.paymentMethod || 'sham_cash');
+    setStatus(exp.status || 'paid');
+    setNotes(exp.notes || '');
     setIsModalOpen(true);
   };
 
@@ -858,18 +904,29 @@ export const ExpensesView: React.FC = () => {
                           {exp.status === 'paid' ? 'مدفوع' : 'مستحق'}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'center' }} className="no-print">
-                        <button 
-                          className="btn btn-sm btn-outline" 
-                          style={{ color: 'var(--danger-color)', borderColor: '#fecaca' }}
-                          onClick={() => {
-                            if (confirm(`هل أنت متأكد من حذف السند ${exp.billNumber}؟`)) {
-                              deleteExpense(exp.id);
-                            }
-                          }}
-                        >
-                          حذف
-                        </button>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }} className="no-print">
+                        <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            style={{ color: '#2563eb', borderColor: '#bfdbfe', fontWeight: 800, padding: '0.25rem 0.65rem' }}
+                            onClick={() => handleEditExpense(exp)}
+                            title="تعديل هذا القيد / المصروف"
+                          >
+                            ✏️ تعديل
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            style={{ color: 'var(--danger-color)', borderColor: '#fecaca', padding: '0.25rem 0.65rem' }}
+                            onClick={() => {
+                              if (confirm(`هل أنت متأكد من حذف السند ${exp.billNumber} (${exp.vendorName})؟`)) {
+                                deleteExpense(exp.id);
+                              }
+                            }}
+                            title="حذف هذا السند"
+                          >
+                            حذف
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -880,13 +937,15 @@ export const ExpensesView: React.FC = () => {
         </div>
       </div>
 
-      {/* Add Expense Modal */}
+      {/* Add / Edit Expense Modal */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3>تسجيل مصروف أو فاتورة مشتريات</h3>
-              <button className="modal-close" onClick={() => setIsModalOpen(false)}>×</button>
+              <h3>
+                {editingExpense ? `✏️ تعديل بيانات القيد / المصروف (${editingExpense.billNumber})` : 'تسجيل مصروف أو فاتورة مشتريات'}
+              </h3>
+              <button className="modal-close" onClick={() => { setIsModalOpen(false); setEditingExpense(null); }}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -1222,11 +1281,15 @@ export const ExpensesView: React.FC = () => {
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  onClick={() => { setIsModalOpen(false); setEditingExpense(null); }}
+                >
                   إلغاء
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  حفظ وترحيل المصروف
+                <button type="submit" className="btn btn-primary" style={{ fontWeight: 800 }}>
+                  {editingExpense ? '💾 حفظ التعديلات' : 'حفظ وترحيل المصروف'}
                 </button>
               </div>
             </form>

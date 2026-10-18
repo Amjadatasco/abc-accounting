@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAccounting } from '../context/AccountingContext';
-import type { JournalLine, Currency } from '../types/accounting';
+import type { JournalLine, Currency, JournalEntry } from '../types/accounting';
 
 interface JournalViewProps {
   isModalOpen?: boolean;
@@ -13,7 +13,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
   onCloseModal: externalCloseModal,
   onOpenModal: externalOpenModal
 }) => {
-  const { journalEntries, accounts, addJournalEntry } = useAccounting();
+  const { journalEntries, accounts, addJournalEntry, updateJournalEntry, deleteJournalEntry } = useAccounting();
 
   const [internalModalOpen, setInternalModalOpen] = useState(false);
   const isModalOpen = externalModalOpen !== undefined ? externalModalOpen : internalModalOpen;
@@ -27,6 +27,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
+  const [editingEntry, setEditingEntry] = useState<JournalEntry | null>(null);
 
   // New Entry Form State
   const [entryCurrency, setEntryCurrency] = useState<Currency>('USD');
@@ -73,6 +74,34 @@ export const JournalView: React.FC<JournalViewProps> = ({
     setLines(lines.filter((_, i) => i !== index));
   };
 
+  const handleEditEntry = (je: JournalEntry) => {
+    setEditingEntry(je);
+    setEntryCurrency(je.currency || 'USD');
+    setEntryDate(je.date);
+    setReference(je.reference || '');
+    setNotes(je.notes || '');
+    setLines(je.lines && je.lines.length > 0 ? je.lines.map(l => ({ ...l })) : [
+      { accountId: '', accountName: '', accountCode: '', description: '', debit: 0, credit: 0 },
+      { accountId: '', accountName: '', accountCode: '', description: '', debit: 0, credit: 0 }
+    ]);
+    setErrorMsg('');
+    setModalOpen(true);
+  };
+
+  const openNewEntryModal = () => {
+    setEditingEntry(null);
+    setEntryCurrency('USD');
+    setEntryDate(new Date().toISOString().split('T')[0]);
+    setReference('');
+    setNotes('');
+    setLines([
+      { accountId: '', accountName: '', accountCode: '', description: '', debit: 0, credit: 0 },
+      { accountId: '', accountName: '', accountCode: '', description: '', debit: 0, credit: 0 }
+    ]);
+    setErrorMsg('');
+    setModalOpen(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -84,27 +113,49 @@ export const JournalView: React.FC<JournalViewProps> = ({
       return;
     }
 
-    const nextNumber = `JE-2026-${String(journalEntries.length + 1).padStart(3, '0')}`;
-    const result = addJournalEntry({
-      entryNumber: nextNumber,
-      date: entryDate,
-      reference,
-      notes,
-      currency: entryCurrency,
-      currencySymbol: entryCurrSym,
-      lines: lines.map(l => ({
-        ...l,
-        debit: Number(l.debit) || 0,
-        credit: Number(l.credit) || 0
-      }))
-    });
+    if (editingEntry) {
+      const result = updateJournalEntry({
+        ...editingEntry,
+        date: entryDate,
+        reference,
+        notes,
+        currency: entryCurrency,
+        currencySymbol: entryCurrSym,
+        lines: lines.map(l => ({
+          ...l,
+          debit: Number(l.debit) || 0,
+          credit: Number(l.credit) || 0
+        }))
+      });
 
-    if (!result.success) {
-      setErrorMsg(result.error || 'حدث خطأ أثناء حفظ القيد.');
-      return;
+      if (!result.success) {
+        setErrorMsg(result.error || 'حدث خطأ أثناء تعديل القيد.');
+        return;
+      }
+    } else {
+      const nextNumber = `JE-2026-${String(journalEntries.length + 1).padStart(3, '0')}`;
+      const result = addJournalEntry({
+        entryNumber: nextNumber,
+        date: entryDate,
+        reference,
+        notes,
+        currency: entryCurrency,
+        currencySymbol: entryCurrSym,
+        lines: lines.map(l => ({
+          ...l,
+          debit: Number(l.debit) || 0,
+          credit: Number(l.credit) || 0
+        }))
+      });
+
+      if (!result.success) {
+        setErrorMsg(result.error || 'حدث خطأ أثناء حفظ القيد.');
+        return;
+      }
     }
 
     // Reset & close
+    setEditingEntry(null);
     setEntryCurrency('USD');
     setReference('');
     setNotes('');
@@ -131,7 +182,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
           <p>تسجيل ومتابعة القيود المحاسبية بنظام القيد المزدوج المتوازن</p>
         </div>
         <div className="header-actions">
-          <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
+          <button className="btn btn-primary" onClick={openNewEntryModal}>
             <span>+</span> قيد يومية يدوي جديد
           </button>
         </div>
@@ -196,7 +247,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                 <th>البيان والملاحظات</th>
                 <th style={{ textAlign: 'center', width: '110px' }}>العملة</th>
                 <th style={{ textAlign: 'left', width: '140px' }}>إجمالي القيد</th>
-                <th style={{ width: '100px' }}>التفاصيل</th>
+                <th style={{ width: '180px', textAlign: 'center' }}>الإجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -227,13 +278,37 @@ export const JournalView: React.FC<JournalViewProps> = ({
                       <td style={{ textAlign: 'left', fontWeight: 800 }}>
                         {jeSym} {total.toLocaleString()}
                       </td>
-                      <td>
-                        <button 
-                          className="btn btn-sm btn-outline" 
-                          onClick={() => setSelectedEntry(isExpanded ? null : je.id)}
-                        >
-                          {isExpanded ? 'إخفاء' : 'عرض الأطراف'}
-                        </button>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            onClick={() => setSelectedEntry(isExpanded ? null : je.id)}
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
+                            title={isExpanded ? 'إخفاء الأطراف' : 'عرض أطراف القيد'}
+                          >
+                            {isExpanded ? 'إخفاء' : 'عرض'}
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            style={{ color: '#2563eb', borderColor: '#bfdbfe', fontWeight: 800, padding: '0.25rem 0.55rem', fontSize: '0.8rem' }}
+                            onClick={() => handleEditEntry(je)}
+                            title="تعديل هذا القيد"
+                          >
+                            ✏️ تعديل
+                          </button>
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            style={{ color: 'var(--danger-color)', borderColor: '#fecaca', padding: '0.25rem 0.55rem', fontSize: '0.8rem' }}
+                            onClick={() => {
+                              if (confirm(`هل أنت متأكد من حذف القيد ${je.entryNumber}؟`)) {
+                                deleteJournalEntry(je.id);
+                              }
+                            }}
+                            title="حذف هذا القيد"
+                          >
+                            حذف
+                          </button>
+                        </div>
                       </td>
                     </tr>
 
@@ -285,8 +360,10 @@ export const JournalView: React.FC<JournalViewProps> = ({
         <div className="modal-overlay">
           <div className="modal-content modal-lg">
             <div className="modal-header">
-              <h3>تسجيل قيد يومية يدوي (Double-Entry)</h3>
-              <button className="modal-close" onClick={() => setModalOpen(false)}>×</button>
+              <h3>
+                {editingEntry ? `✏️ تعديل القيد اليومي (${editingEntry.entryNumber})` : 'تسجيل قيد يومية يدوي (Double-Entry)'}
+              </h3>
+              <button className="modal-close" onClick={() => { setModalOpen(false); setEditingEntry(null); }}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -485,11 +562,15 @@ export const JournalView: React.FC<JournalViewProps> = ({
               </div>
 
               <div className="modal-footer">
-                <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)}>
+                <button 
+                  type="button" 
+                  className="btn btn-outline" 
+                  onClick={() => { setModalOpen(false); setEditingEntry(null); }}
+                >
                   إلغاء
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={!isBalanced}>
-                  ترحيل وحفظ القيد
+                <button type="submit" className="btn btn-primary" disabled={!isBalanced} style={{ fontWeight: 800 }}>
+                  {editingEntry ? '💾 حفظ التعديلات' : 'ترحيل وحفظ القيد'}
                 </button>
               </div>
             </form>

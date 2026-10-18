@@ -55,7 +55,10 @@ interface AccountingContextType {
   markInvoicePaid: (id: string, accountId?: string) => void;
   deleteInvoice: (id: string) => void;
   addExpense: (expense: Omit<ExpenseBill, 'id' | 'createdAt'>) => void;
+  updateExpense: (expense: ExpenseBill) => void;
   deleteExpense: (id: string) => void;
+  updateJournalEntry: (entry: JournalEntry) => { success: boolean; error?: string };
+  deleteJournalEntry: (id: string) => void;
   addContact: (contact: Omit<Contact, 'id' | 'createdAt'>) => void;
   updateContact: (contact: Contact) => void;
   deleteContact: (id: string) => void;
@@ -711,9 +714,122 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const updateExpense = (updatedExp: ExpenseBill) => {
+    setExpenses(prev => prev.map(e => e.id === updatedExp.id ? updatedExp : e));
+    syncRowToCloud('accounting_expenses', {
+      id: updatedExp.id,
+      bill_number: updatedExp.billNumber,
+      vendor_id: updatedExp.vendorId,
+      vendor_name: updatedExp.vendorName,
+      date: updatedExp.date,
+      category: updatedExp.accountId,
+      currency: updatedExp.currency,
+      currency_symbol: updatedExp.currencySymbol,
+      total_amount: updatedExp.amount,
+      paid_amount: updatedExp.status === 'paid' ? updatedExp.amount : 0,
+      status: updatedExp.status,
+      data: updatedExp,
+      updated_at: new Date().toISOString(),
+    });
+
+    // Also update corresponding journal entry if exists
+    const jeIndex = journalEntries.findIndex(j => j.reference === updatedExp.billNumber || j.entryNumber === `JE-${updatedExp.billNumber}`);
+    const expAcc = accounts.find(a => a.id === updatedExp.accountId) || accounts.find(a => a.category === 'expense');
+    const paymentAcc = updatedExp.paymentMethod === 'cash' 
+      ? (accounts.find(a => a.code === '1110') || accounts.find(a => a.code === '1120'))
+      : updatedExp.paymentMethod === 'sham_cash'
+      ? (accounts.find(a => a.code === '1125') || accounts.find(a => a.name.includes('شام كاش')) || accounts.find(a => a.code === '1110'))
+      : (accounts.find(a => a.code === '1120') || accounts.find(a => a.code === '1110'));
+    const apAcc = accounts.find(a => a.code === '2110');
+    const creditAcc = updatedExp.status === 'paid' ? paymentAcc : apAcc;
+
+    if (jeIndex !== -1 && expAcc && creditAcc) {
+      const existingJE = journalEntries[jeIndex];
+      const payerLabel = updatedExp.paidBy === 'amjad' ? 'بواسطة أمجد' : updatedExp.paidBy === 'nour' ? 'بواسطة نور' : 'شركة ABC';
+      const updatedJE: JournalEntry = {
+        ...existingJE,
+        date: updatedExp.date,
+        notes: `تسجيل مصروف: ${updatedExp.notes || updatedExp.vendorName} [${payerLabel}] (${updatedExp.currencySymbol || '$'})`,
+        currency: updatedExp.currency,
+        currencySymbol: updatedExp.currencySymbol,
+        lines: [
+          {
+            accountId: expAcc.id,
+            accountCode: expAcc.code,
+            accountName: expAcc.name,
+            description: updatedExp.notes || 'مصروف تشغيلي',
+            debit: updatedExp.amount,
+            credit: 0
+          },
+          {
+            accountId: creditAcc.id,
+            accountCode: creditAcc.code,
+            accountName: creditAcc.name,
+            description: `سداد أو التزام للمورد ${updatedExp.vendorName}`,
+            debit: 0,
+            credit: updatedExp.amount
+          }
+        ]
+      };
+
+      setJournalEntries(prev => prev.map((j, idx) => idx === jeIndex ? updatedJE : j));
+      syncRowToCloud('accounting_journal', {
+        id: updatedJE.id,
+        entry_number: updatedJE.entryNumber,
+        date: updatedJE.date,
+        reference: updatedJE.reference,
+        notes: updatedJE.notes,
+        currency: updatedJE.currency || 'USD',
+        currency_symbol: updatedJE.currencySymbol || '$',
+        total_debit: updatedExp.amount,
+        total_credit: updatedExp.amount,
+        data: updatedJE,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  };
+
   const deleteExpense = (id: string) => {
+    const target = expenses.find(e => e.id === id);
     setExpenses(prev => prev.filter(e => e.id !== id));
     deleteRowFromCloud('accounting_expenses', id);
+
+    if (target) {
+      const matchingJE = journalEntries.find(j => j.reference === target.billNumber || j.entryNumber === `JE-${target.billNumber}`);
+      if (matchingJE) {
+        setJournalEntries(prev => prev.filter(j => j.id !== matchingJE.id));
+        deleteRowFromCloud('accounting_journal', matchingJE.id);
+      }
+    }
+  };
+
+  const updateJournalEntry = (updated: JournalEntry): { success: boolean; error?: string } => {
+    const totalDebit = updated.lines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
+    const totalCredit = updated.lines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
+    if (Math.abs(totalDebit - totalCredit) >= 0.01) {
+      return { success: false, error: 'القيد غير متوازن: مجموع المدين يجب أن يساوي مجموع الدائن.' };
+    }
+
+    setJournalEntries(prev => prev.map(j => j.id === updated.id ? updated : j));
+    syncRowToCloud('accounting_journal', {
+      id: updated.id,
+      entry_number: updated.entryNumber,
+      date: updated.date,
+      reference: updated.reference,
+      notes: updated.notes,
+      currency: updated.currency || 'USD',
+      currency_symbol: updated.currencySymbol || '$',
+      total_debit: totalDebit,
+      total_credit: totalCredit,
+      data: updated,
+      updated_at: new Date().toISOString(),
+    });
+    return { success: true };
+  };
+
+  const deleteJournalEntry = (id: string) => {
+    setJournalEntries(prev => prev.filter(j => j.id !== id));
+    deleteRowFromCloud('accounting_journal', id);
   };
 
   // Contacts
@@ -917,7 +1033,10 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       markInvoicePaid,
       deleteInvoice,
       addExpense,
+      updateExpense,
       deleteExpense,
+      updateJournalEntry,
+      deleteJournalEntry,
       addContact,
       updateContact,
       deleteContact,
