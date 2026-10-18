@@ -48,16 +48,26 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   const customers = contacts.filter(c => c.type === 'customer' || c.type === 'both');
 
-  const handleItemChange = (index: number, field: keyof Omit<InvoiceItem, 'id'>, value: any) => {
+  const handleItemChange = (index: number, field: keyof Omit<InvoiceItem, 'id'> | 'lineTotal', value: any) => {
     const newItems = [...items];
-    const item = { ...newItems[index], [field]: value };
-    
-    const qty = Number(item.quantity) || 0;
-    const price = Number(item.unitPrice) || 0;
-    const taxRate = Number(item.taxRate) || 0;
-    const sub = qty * price;
-    const tax = sub * (taxRate / 100);
-    item.total = sub + tax;
+    const item = { ...newItems[index] };
+
+    if (field === 'lineTotal') {
+      const tot = parseFloat(value) || 0;
+      const qty = Number(item.quantity) || 1;
+      const taxRate = Number(item.taxRate) || 0;
+      const sub = taxRate > 0 ? tot / (1 + taxRate / 100) : tot;
+      item.unitPrice = qty > 0 ? Math.round((sub / qty) * 10000) / 10000 : 0;
+      item.total = tot;
+    } else {
+      (item as any)[field] = value;
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unitPrice) || 0;
+      const taxRate = Number(item.taxRate) || 0;
+      const sub = qty * price;
+      const tax = sub * (taxRate / 100);
+      item.total = Math.round((sub + tax) * 10000) / 10000;
+    }
 
     newItems[index] = item;
     setItems(newItems);
@@ -472,8 +482,16 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                               <option value="5">5% (ضريبة مبيعات عامة ودعاية)</option>
                             </select>
                           </td>
-                          <td style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
-                            {formCurrSym} {it.total.toLocaleString()}
+                          <td>
+                            <input 
+                              type="number" 
+                              step="any" 
+                              className="form-input" 
+                              placeholder="0.00"
+                              value={it.total || ''}
+                              onChange={(e) => handleItemChange(idx, 'lineTotal', e.target.value)}
+                              style={{ padding: '0.45rem 0.6rem', fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary-color)', backgroundColor: '#eff6ff' }}
+                            />
                           </td>
                           <td>
                             {items.length > 1 && (

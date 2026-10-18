@@ -26,6 +26,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
   const [itemDescription, setItemDescription] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unitPrice, setUnitPrice] = useState('');
+  const [totalAmountInput, setTotalAmountInput] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'sham_cash' | 'cash' | 'bank' | 'credit'>('sham_cash');
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('paid');
   const [partialAmount, setPartialAmount] = useState('');
@@ -33,6 +34,52 @@ export const SalesView: React.FC<SalesViewProps> = () => {
   const [notes, setNotes] = useState('');
 
   const currSym = currency === 'SYP' ? 'ل.س' : '$';
+
+  // Smart Bidirectional Calculation:
+  // When quantity changes: update total if unitPrice exists, or update unitPrice if total exists
+  // When unitPrice changes: update total
+  // When total changes: update unitPrice
+  const formatNumberClean = (num: number): string => {
+    if (isNaN(num) || !isFinite(num)) return '';
+    const rounded = Math.round(num * 10000) / 10000;
+    return String(rounded);
+  };
+
+  const handleQuantityChange = (val: string) => {
+    setQuantity(val);
+    const q = parseFloat(val);
+    const p = parseFloat(unitPrice);
+    const t = parseFloat(totalAmountInput);
+    if (q > 0) {
+      if (unitPrice !== '' && !isNaN(p) && p > 0) {
+        setTotalAmountInput(formatNumberClean(q * p));
+      } else if (totalAmountInput !== '' && !isNaN(t) && t > 0) {
+        setUnitPrice(formatNumberClean(t / q));
+      }
+    }
+  };
+
+  const handleUnitPriceChange = (val: string) => {
+    setUnitPrice(val);
+    const p = parseFloat(val);
+    const q = parseFloat(quantity) || 1;
+    if (val !== '' && !isNaN(p) && p >= 0 && q > 0) {
+      setTotalAmountInput(formatNumberClean(q * p));
+    } else if (val === '') {
+      setTotalAmountInput('');
+    }
+  };
+
+  const handleTotalAmountChange = (val: string) => {
+    setTotalAmountInput(val);
+    const t = parseFloat(val);
+    const q = parseFloat(quantity) || 1;
+    if (val !== '' && !isNaN(t) && t >= 0 && q > 0) {
+      setUnitPrice(formatNumberClean(t / q));
+    } else if (val === '') {
+      setUnitPrice('');
+    }
+  };
 
   // Preset services & products for fast 1-click selection
   const servicePresets = [
@@ -55,14 +102,19 @@ export const SalesView: React.FC<SalesViewProps> = () => {
 
   const customers = contacts.filter(c => c.type === 'customer' || c.type === 'both');
 
-  const computedTotal = (parseFloat(quantity) || 0) * (parseFloat(unitPrice) || 0);
-
   const handleSubmit = (e: React.FormEvent, printImmediately = false) => {
     e.preventDefault();
     const custTrimmed = customerName.trim();
     const itemTrimmed = itemDescription.trim();
-    const priceNum = parseFloat(unitPrice) || 0;
     const qtyNum = parseFloat(quantity) || 1;
+    let priceNum = parseFloat(unitPrice) || 0;
+    let totalNum = parseFloat(totalAmountInput) || 0;
+
+    if (totalNum <= 0 && priceNum > 0) {
+      totalNum = qtyNum * priceNum;
+    } else if (priceNum <= 0 && totalNum > 0) {
+      priceNum = totalNum / qtyNum;
+    }
 
     if (!custTrimmed) {
       alert('يرجى تحديد أو كتابة اسم العميل');
@@ -72,8 +124,8 @@ export const SalesView: React.FC<SalesViewProps> = () => {
       alert('يرجى كتابة أو اختيار بيان الخدمة أو المنتج المباع');
       return;
     }
-    if (priceNum <= 0) {
-      alert('يرجى إدخال سعر صحيح أكبر من الصفر');
+    if (totalNum <= 0) {
+      alert('يرجى إدخال السعر الفردي أو المبلغ الإجمالي بشكل صحيح أكبر من الصفر');
       return;
     }
 
@@ -92,7 +144,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
       });
     }
 
-    const totalAmount = qtyNum * priceNum;
+    const totalAmount = totalNum;
     let paidAmount = 0;
     let finalStatus: 'paid' | 'partial' | 'unpaid' = 'paid';
 
@@ -155,6 +207,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
     setItemDescription('');
     setQuantity('1');
     setUnitPrice('');
+    setTotalAmountInput('');
     setPartialAmount('');
     setNotes('');
     setIsModalOpen(false);
@@ -644,44 +697,80 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                   </div>
                 </div>
 
-                {/* 5. Quantity, Price, & Live Total */}
-                <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1.25rem' }}>
-                  <div className="form-row" style={{ alignItems: 'flex-end', marginBottom: 0 }}>
+                {/* 5. Quantity, Price, & Editable Live Total (Bidirectional Smart Calculation) */}
+                <div style={{ padding: '1.1rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--border-color)', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem', alignItems: 'flex-start' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">الكمية *</label>
+                      <label className="form-label" style={{ fontWeight: 800 }}>الكمية (العدد) *</label>
                       <input 
                         type="number" 
-                        min="1" 
+                        min="0.001" 
                         step="any"
                         className="form-input" 
                         required 
                         value={quantity} 
-                        onChange={(e) => setQuantity(e.target.value)}
-                        style={{ textAlign: 'center', fontWeight: 700 }}
+                        onChange={(e) => handleQuantityChange(e.target.value)}
+                        style={{ textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}
                       />
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                        عدد القطع أو الوحدات
+                      </span>
                     </div>
 
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">السعر الفردي ({currSym}) *</label>
+                      <label className="form-label" style={{ fontWeight: 800 }}>السعر الفردي ({currSym})</label>
                       <input 
                         type="number" 
                         step="any" 
-                        min="0.01"
+                        min="0"
                         className="form-input" 
-                        required 
                         placeholder="0.00"
                         value={unitPrice} 
-                        onChange={(e) => setUnitPrice(e.target.value)}
-                        style={{ fontWeight: 800 }}
+                        onChange={(e) => handleUnitPriceChange(e.target.value)}
+                        style={{ fontWeight: 800, fontSize: '1rem' }}
                       />
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                        سعر القطعة الواحدة
+                      </span>
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: 0, textAlign: 'left' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.35rem' }}>المبلغ الإجمالي النهائي:</span>
-                      <div style={{ fontSize: '1.4rem', fontWeight: 900, color: 'var(--primary-color)' }}>
-                        {currSym} {computedTotal.toLocaleString()}
-                      </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label" style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
+                        المبلغ الإجمالي النهائي ({currSym}) *
+                      </label>
+                      <input 
+                        type="number" 
+                        step="any" 
+                        min="0"
+                        className="form-input" 
+                        placeholder="0.00"
+                        value={totalAmountInput} 
+                        onChange={(e) => handleTotalAmountChange(e.target.value)}
+                        style={{ 
+                          fontWeight: 900, 
+                          color: 'var(--primary-color)', 
+                          fontSize: '1.15rem', 
+                          backgroundColor: '#eff6ff', 
+                          borderColor: '#93c5fd',
+                          boxShadow: '0 1px 3px rgba(37,99,235,0.08)'
+                        }}
+                      />
+                      <span style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 700, marginTop: '0.25rem', display: 'block' }}>
+                        قيمة العملية الإجمالية
+                      </span>
                     </div>
+                  </div>
+
+                  {/* Smart helper banner */}
+                  <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', borderRadius: 'var(--radius-sm)', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.78rem' }}>
+                    <span style={{ color: '#166534', fontWeight: 600 }}>
+                      💡 <strong>حساب ذكي وتلقائي:</strong> يمكنك كتابة <u>المبلغ الإجمالي</u> مع العدد وسيحسب النظام السعر الفردي تلقائياً، أو العكس تماماً!
+                    </span>
+                    {parseFloat(totalAmountInput) > 0 && (
+                      <span style={{ fontWeight: 900, color: '#15803d', fontSize: '0.9rem' }}>
+                        المجموع: {currSym} {parseFloat(totalAmountInput).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      </span>
+                    )}
                   </div>
                 </div>
 
