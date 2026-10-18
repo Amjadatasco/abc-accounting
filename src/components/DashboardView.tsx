@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAccounting } from '../context/AccountingContext';
+import type { Invoice } from '../types/accounting';
 
 interface DashboardViewProps {
   onNavigate: (tab: string) => void;
@@ -17,10 +18,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const unpaidInvoices = invoices.filter(inv => inv.status !== 'paid');
 
-  // Compute live actual metrics from registered invoices & expenses
-  const actualRevenue = invoices.reduce((sum, inv) => {
-    return sum + (Number(inv.totalAmount) || 0);
-  }, 0);
+  // Compute live actual metrics from registered invoices & expenses separated by currency
+  const actualRevenueUSD = invoices
+    .filter(inv => (inv.currency || 'USD') === 'USD')
+    .reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
+
+  const actualRevenueSYP = invoices
+    .filter(inv => (inv.currency || 'USD') === 'SYP')
+    .reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
+
+  // Rate for calculating unified profit/revenue
+  const todayRate = parseFloat(localStorage.getItem('last_dollar_rate') || '14800') || 14800;
+  const actualRevenueUnifiedUSD = actualRevenueUSD + (todayRate > 0 ? actualRevenueSYP / todayRate : 0);
+
+  const getInvUSD = (inv: Invoice) => {
+    if ((inv.currency || 'USD') === 'USD') return Number(inv.totalAmount) || 0;
+    return todayRate > 0 ? (Number(inv.totalAmount) || 0) / todayRate : 0;
+  };
 
   // Unified expenses in USD (converting SYP at transaction rate e.g. 130 or 14800)
   const actualExpensesUSD = expenses.reduce((sum, exp) => {
@@ -49,7 +63,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return sum + (rate > 0 ? (Number(exp.amount) || 0) / rate : 0);
     }, 0);
 
-  const netProfit = actualRevenue - actualExpensesUSD;
+  const netProfit = actualRevenueUnifiedUSD - actualExpensesUSD;
 
   return (
     <div>
@@ -77,11 +91,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="stat-title">إجمالي الإيرادات والمبيعات</span>
             <span className="badge badge-blue">سنة 2026</span>
           </div>
-          <div className="stat-value" style={{ color: 'var(--primary-color)' }}>
-            {curr} {actualRevenue.toLocaleString()}
+          <div className="stat-value" style={{ color: 'var(--primary-color)', display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '0.4rem' }}>
+            <span>$ {actualRevenueUSD.toLocaleString()}</span>
+            {actualRevenueSYP > 0 && (
+              <span style={{ fontSize: '0.95rem', fontWeight: 800, color: '#16a34a' }}>
+                + {actualRevenueSYP.toLocaleString()} ل.س
+              </span>
+            )}
           </div>
           <div className="stat-footer">
-            <span>{invoices.length} عمليات بيع مسجلة</span>
+            <span>
+              {actualRevenueSYP > 0
+                ? `${actualRevenueUSD} $ بالدولار + ${actualRevenueSYP.toLocaleString()} ل.س (${invoices.length} فواتير)`
+                : `${invoices.length} عمليات بيع مسجلة`}
+            </span>
           </div>
         </div>
 
@@ -195,7 +218,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {[
             { 
               month: 'يناير 2026', 
-              rev: invoices.filter(i => i.date?.startsWith('2026-01')).reduce((s, i) => s + (Number(i.totalAmount) || 0), 0), 
+              rev: invoices.filter(i => i.date?.startsWith('2026-01')).reduce((s, i) => s + getInvUSD(i), 0), 
               exp: expenses.filter(e => e.date?.startsWith('2026-01')).reduce((s, e) => {
                 if ((e.currency || 'USD') === 'USD') return s + (Number(e.amount) || 0);
                 const rate = e.exchangeRate || 130;
@@ -204,7 +227,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             },
             { 
               month: 'فبراير 2026', 
-              rev: invoices.filter(i => i.date?.startsWith('2026-02')).reduce((s, i) => s + (Number(i.totalAmount) || 0), 0), 
+              rev: invoices.filter(i => i.date?.startsWith('2026-02')).reduce((s, i) => s + getInvUSD(i), 0), 
               exp: expenses.filter(e => e.date?.startsWith('2026-02')).reduce((s, e) => {
                 if ((e.currency || 'USD') === 'USD') return s + (Number(e.amount) || 0);
                 const rate = e.exchangeRate || 130;
@@ -213,7 +236,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             },
             { 
               month: 'مارس 2026', 
-              rev: invoices.filter(i => i.date?.startsWith('2026-03')).reduce((s, i) => s + (Number(i.totalAmount) || 0), 0), 
+              rev: invoices.filter(i => i.date?.startsWith('2026-03')).reduce((s, i) => s + getInvUSD(i), 0), 
               exp: expenses.filter(e => e.date?.startsWith('2026-03')).reduce((s, e) => {
                 if ((e.currency || 'USD') === 'USD') return s + (Number(e.amount) || 0);
                 const rate = e.exchangeRate || 130;
@@ -222,11 +245,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             },
             { 
               month: 'إجمالي التأسيس', 
-              rev: actualRevenue, 
+              rev: actualRevenueUnifiedUSD, 
               exp: actualExpensesUSD 
             },
           ].map((bar, idx) => {
-            const maxVal = Math.max(actualExpensesUSD, actualRevenue, 1000);
+            const maxVal = Math.max(actualExpensesUSD, actualRevenueUnifiedUSD, 1000);
             const revHeight = Math.min(150, Math.max(10, (bar.rev / maxVal) * 150));
             const expHeight = Math.min(150, Math.max(15, (bar.exp / maxVal) * 150));
 
