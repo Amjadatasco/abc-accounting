@@ -212,7 +212,7 @@ export const ExpensesView: React.FC = () => {
         );
       case 'nour':
         return (
-          <span style={{ backgroundColor: '#faf5ff', color: '#7e22ce', border: '1px solid #e9d5ff', padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 800 }}>
+          <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '0.2rem 0.55rem', borderRadius: '4px', fontSize: '0.78rem', fontWeight: 800 }}>
             👤 نور
           </span>
         );
@@ -426,19 +426,19 @@ export const ExpensesView: React.FC = () => {
           onClick={() => setActiveTab('nour')}
           style={{ 
             padding: '1rem 1.15rem', 
-            borderRight: '4px solid #9333ea', 
+            borderRight: '4px solid #16a34a', 
             cursor: 'pointer',
-            backgroundColor: activeTab === 'nour' ? '#faf5ff' : 'white'
+            backgroundColor: activeTab === 'nour' ? '#f0fdf4' : 'white'
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="stat-title" style={{ fontWeight: 800, color: '#7e22ce' }}>👤 مصاريف نور</span>
-            <span style={{ fontSize: '0.75rem', color: '#9333ea' }}>{nourExpenses.length} سند</span>
+            <span className="stat-title" style={{ fontWeight: 800, color: '#15803d' }}>👤 مصاريف نور</span>
+            <span style={{ fontSize: '0.75rem', color: '#16a34a' }}>{nourExpenses.length} سند</span>
           </div>
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المجموع الموحد:</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#9333ea' }}>
+              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#16a34a' }}>
                 $ {Math.round(nourUnifiedUSD).toLocaleString()}
               </span>
             </div>
@@ -454,9 +454,9 @@ export const ExpensesView: React.FC = () => {
       {/* Dedicated Dollar Rate & Currency Reconciliation Card for the 3 Partner/Company Pages */}
       {(activeTab === 'abc' || activeTab === 'amjad' || activeTab === 'nour') && (() => {
         const activeName = activeTab === 'amjad' ? 'أمجد' : activeTab === 'nour' ? 'نور' : 'شركة ABC';
-        const activeColor = activeTab === 'amjad' ? '#2563eb' : activeTab === 'nour' ? '#9333ea' : '#334155';
-        const activeBg = activeTab === 'amjad' ? '#eff6ff' : activeTab === 'nour' ? '#faf5ff' : '#f8fafc';
-        const activeBorder = activeTab === 'amjad' ? '#bfdbfe' : activeTab === 'nour' ? '#e9d5ff' : '#cbd5e1';
+        const activeColor = activeTab === 'amjad' ? '#2563eb' : activeTab === 'nour' ? '#16a34a' : '#334155';
+        const activeBg = activeTab === 'amjad' ? '#eff6ff' : activeTab === 'nour' ? '#f0fdf4' : '#f8fafc';
+        const activeBorder = activeTab === 'amjad' ? '#bfdbfe' : activeTab === 'nour' ? '#bbf7d0' : '#cbd5e1';
         const activeUSD = activeTab === 'amjad' ? amjadUSD : activeTab === 'nour' ? nourUSD : abcUSD;
         const activeSYP = activeTab === 'amjad' ? amjadSYP : activeTab === 'nour' ? nourSYP : abcSYP;
         const activeUniUSD = activeTab === 'amjad' ? amjadUnifiedUSD : activeTab === 'nour' ? nourUnifiedUSD : abcUnifiedUSD;
@@ -637,21 +637,21 @@ export const ExpensesView: React.FC = () => {
                   <td style={{ fontSize: '0.8rem', color: '#1d4ed8', fontWeight: 600 }}>دفعه أمجد (مستحق له بذمة الشركة)</td>
                 </tr>
 
-                <tr style={{ backgroundColor: '#faf5ff' }}>
-                  <td style={{ fontWeight: 800, color: '#7e22ce' }}>👤 نور</td>
+                <tr style={{ backgroundColor: '#f0fdf4' }}>
+                  <td style={{ fontWeight: 800, color: '#15803d' }}>👤 نور</td>
                   <td style={{ textAlign: 'center' }}>{nourExpenses.length}</td>
-                  <td style={{ textAlign: 'left', fontWeight: 700, color: '#7e22ce' }}>$ {nourUSD.toLocaleString()}</td>
-                  <td style={{ textAlign: 'left', fontWeight: 700, color: '#7e22ce' }}>{nourSYP.toLocaleString()} ل.س</td>
-                  <td style={{ textAlign: 'left', fontWeight: 800, color: '#7e22ce', backgroundColor: '#f3e8ff' }}>
+                  <td style={{ textAlign: 'left', fontWeight: 700, color: '#15803d' }}>$ {nourUSD.toLocaleString()}</td>
+                  <td style={{ textAlign: 'left', fontWeight: 700, color: '#15803d' }}>{nourSYP.toLocaleString()} ل.س</td>
+                  <td style={{ textAlign: 'left', fontWeight: 800, color: '#15803d', backgroundColor: '#dcfce7' }}>
                     $ {nourUnifiedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td style={{ textAlign: 'left', fontWeight: 800, color: '#6b21a8', backgroundColor: '#faf5ff' }}>
+                  <td style={{ textAlign: 'left', fontWeight: 800, color: '#166534', backgroundColor: '#f0fdf4' }}>
                     {Math.round(nourUnifiedSYP).toLocaleString()} ل.س
                   </td>
-                  <td style={{ textAlign: 'center', fontWeight: 800, color: '#7e22ce', backgroundColor: '#f3e8ff' }}>
+                  <td style={{ textAlign: 'center', fontWeight: 800, color: '#15803d', backgroundColor: '#dcfce7' }}>
                     {totalUnifiedUSD > 0 ? ((nourUnifiedUSD / totalUnifiedUSD) * 100).toFixed(1) : 0} %
                   </td>
-                  <td style={{ fontSize: '0.8rem', color: '#7e22ce', fontWeight: 600 }}>دفعه نور (مستحق له بذمة الشركة)</td>
+                  <td style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>دفعه نور (مستحق له بذمة الشركة)</td>
                 </tr>
 
                 <tr style={{ backgroundColor: '#f1f5f9', fontWeight: 800, borderTop: '2px solid var(--border-color)' }}>
@@ -690,7 +690,7 @@ export const ExpensesView: React.FC = () => {
                 <div style={{ display: 'flex', height: '16px', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#e2e8f0' }}>
                   <div style={{ width: `${(abcUnifiedUSD / totalUnifiedUSD) * 100}%`, backgroundColor: '#475569' }} title={`شركة ABC: $${abcUnifiedUSD.toFixed(1)}`} />
                   <div style={{ width: `${(amjadUnifiedUSD / totalUnifiedUSD) * 100}%`, backgroundColor: '#2563eb' }} title={`أمجد: $${amjadUnifiedUSD.toFixed(1)}`} />
-                  <div style={{ width: `${(nourUnifiedUSD / totalUnifiedUSD) * 100}%`, backgroundColor: '#9333ea' }} title={`نور: $${nourUnifiedUSD.toFixed(1)}`} />
+                  <div style={{ width: `${(nourUnifiedUSD / totalUnifiedUSD) * 100}%`, backgroundColor: '#16a34a' }} title={`نور: $${nourUnifiedUSD.toFixed(1)}`} />
                 </div>
               </div>
             )}
@@ -707,7 +707,7 @@ export const ExpensesView: React.FC = () => {
                 <div style={{ display: 'flex', height: '14px', borderRadius: '7px', overflow: 'hidden', backgroundColor: '#e2e8f0' }}>
                   <div style={{ width: `${(abcUSD / totalUSD) * 100}%`, backgroundColor: '#64748b' }} title={`شركة ABC: $${abcUSD}`} />
                   <div style={{ width: `${(amjadUSD / totalUSD) * 100}%`, backgroundColor: '#2563eb' }} title={`أمجد: $${amjadUSD}`} />
-                  <div style={{ width: `${(nourUSD / totalUSD) * 100}%`, backgroundColor: '#9333ea' }} title={`نور: $${nourUSD}`} />
+                  <div style={{ width: `${(nourUSD / totalUSD) * 100}%`, backgroundColor: '#16a34a' }} title={`نور: $${nourUSD}`} />
                 </div>
               </div>
             )}
@@ -724,7 +724,7 @@ export const ExpensesView: React.FC = () => {
                 <div style={{ display: 'flex', height: '14px', borderRadius: '7px', overflow: 'hidden', backgroundColor: '#e2e8f0' }}>
                   <div style={{ width: `${(abcSYP / totalSYP) * 100}%`, backgroundColor: '#64748b' }} title={`شركة ABC: ${abcSYP} ل.س`} />
                   <div style={{ width: `${(amjadSYP / totalSYP) * 100}%`, backgroundColor: '#2563eb' }} title={`أمجد: ${amjadSYP} ل.س`} />
-                  <div style={{ width: `${(nourSYP / totalSYP) * 100}%`, backgroundColor: '#9333ea' }} title={`نور: ${nourSYP} ل.س`} />
+                  <div style={{ width: `${(nourSYP / totalSYP) * 100}%`, backgroundColor: '#16a34a' }} title={`نور: ${nourSYP} ل.س`} />
                 </div>
               </div>
             )}
@@ -1063,15 +1063,15 @@ export const ExpensesView: React.FC = () => {
                       style={{
                         padding: '0.75rem 0.85rem',
                         borderRadius: 'var(--radius-md)',
-                        border: paidBy === 'nour' ? '2px solid #9333ea' : '1.5px solid var(--border-color)',
-                        backgroundColor: paidBy === 'nour' ? '#faf5ff' : 'white',
+                        border: paidBy === 'nour' ? '2px solid #16a34a' : '1.5px solid var(--border-color)',
+                        backgroundColor: paidBy === 'nour' ? '#f0fdf4' : 'white',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
-                        boxShadow: paidBy === 'nour' ? '0 2px 4px rgba(147,51,234,0.1)' : 'none'
+                        boxShadow: paidBy === 'nour' ? '0 2px 4px rgba(22,163,74,0.1)' : 'none'
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                        <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#7e22ce' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.92rem', color: '#15803d' }}>
                           👤 نور
                         </span>
                         <input 
@@ -1082,7 +1082,7 @@ export const ExpensesView: React.FC = () => {
                           style={{ cursor: 'pointer' }}
                         />
                       </div>
-                      <span style={{ fontSize: '0.73rem', color: '#9333ea', display: 'block' }}>
+                      <span style={{ fontSize: '0.73rem', color: '#16a34a', display: 'block' }}>
                         دفعه نور من حسابه الخاص
                       </span>
                     </div>

@@ -111,12 +111,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="stat-card" style={{ borderRight: '4px solid #9333ea' }}>
+        <div className="stat-card" style={{ borderRight: '4px solid #16a34a' }}>
           <div className="stat-header">
             <span className="stat-title">👤 مستحقات الشريك نور</span>
-            <span className="badge" style={{ backgroundColor: '#faf5ff', color: '#9333ea', border: '1px solid #e9d5ff' }}>مصاريف مدفوعة</span>
+            <span className="badge" style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>مصاريف مدفوعة</span>
           </div>
-          <div className="stat-value" style={{ color: '#9333ea' }}>
+          <div className="stat-value" style={{ color: '#16a34a' }}>
             {curr} {Math.round(nourTotalUSD).toLocaleString()}
           </div>
           <div className="stat-footer">
