@@ -41,7 +41,7 @@ export function getSupabaseConfig(): SupabaseConfig {
   }
 
   // 3. Built-in defaults for ABC Accounting project
-  const defaultUrl = 'https://culjxczwajggjbgylfh.supabase.co';
+  const defaultUrl = 'https://euljjxezwajggibgylfh.supabase.co';
   const defaultKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1bGpqeGV6d2FqZ2dpYmd5bGZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4NzM1MTQsImV4cCI6MjEwNzQ0OTUxNH0.f4hJ4H9AO3CXbcRfEv_w9VCqGyhMiNgEPdYSyRuJniU';
 
   return {
