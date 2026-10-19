@@ -291,7 +291,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Pull latest data from Supabase
+  // Pull & bidirectional smart merge from Supabase
   const refreshFromCloud = async () => {
     const config = getSupabaseConfig();
     if (!config.isConfigured) {
@@ -320,40 +320,161 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         client.from('accounting_settings').select('*').limit(1),
       ]);
 
-      let hasAnyCloudData = false;
+      const getLocal = <T,>(key: string, fallback: T): T => {
+        try {
+          const item = localStorage.getItem(`${STORAGE_KEY}_${key}`);
+          return item ? JSON.parse(item) : fallback;
+        } catch {
+          return fallback;
+        }
+      };
 
-      if (invRes.data && invRes.data.length > 0) {
-        setInvoices(invRes.data.map(r => r.data as Invoice));
-        hasAnyCloudData = true;
+      const localInvoices = getLocal<Invoice[]>('invoices', invoices);
+      const localExpenses = getLocal<ExpenseBill[]>('expenses', expenses);
+      const localContacts = getLocal<Contact[]>('contacts', contacts);
+      const localJournal = getLocal<JournalEntry[]>('journal', journalEntries);
+      const localAccounts = getLocal<Account[]>('accounts', accounts);
+      const localSettings = getLocal<CompanySettings>('settings', companySettings);
+
+      // 1. Invoices smart sync
+      const cloudInvoices = (invRes.data || []).map(r => r.data as Invoice);
+      const cloudInvIds = new Set(cloudInvoices.map(i => i.id));
+      const extraLocalInvoices = localInvoices.filter(i => !cloudInvIds.has(i.id));
+
+      if (extraLocalInvoices.length > 0) {
+        await client.from('accounting_invoices').upsert(
+          extraLocalInvoices.map(inv => ({
+            id: inv.id,
+            invoice_number: inv.invoiceNumber,
+            customer_id: inv.customerId || null,
+            customer_name: inv.customerName,
+            date: inv.date,
+            due_date: inv.dueDate || null,
+            currency: inv.currency || 'USD',
+            currency_symbol: inv.currencySymbol || '$',
+            total_amount: inv.totalAmount,
+            paid_amount: inv.paidAmount,
+            status: inv.status,
+            sale_type: inv.saleType || 'service',
+            payment_method: inv.paymentMethod || 'cash',
+            data: inv,
+            updated_at: new Date().toISOString(),
+          }))
+        );
       }
-      if (expRes.data && expRes.data.length > 0) {
-        setExpenses(expRes.data.map(r => r.data as ExpenseBill));
-        hasAnyCloudData = true;
+      const finalInvoices = [...cloudInvoices, ...extraLocalInvoices];
+      if (finalInvoices.length > 0 || cloudInvoices.length > 0) {
+        setInvoices(finalInvoices);
       }
-      if (conRes.data && conRes.data.length > 0) {
-        setContacts(conRes.data.map(r => r.data as Contact));
-        hasAnyCloudData = true;
+
+      // 2. Expenses smart sync
+      const cloudExpenses = (expRes.data || []).map(r => r.data as ExpenseBill);
+      const cloudExpIds = new Set(cloudExpenses.map(e => e.id));
+      const extraLocalExpenses = localExpenses.filter(e => !cloudExpIds.has(e.id));
+
+      if (extraLocalExpenses.length > 0) {
+        await client.from('accounting_expenses').upsert(
+          extraLocalExpenses.map(exp => ({
+            id: exp.id,
+            bill_number: exp.billNumber,
+            vendor_id: exp.vendorId || null,
+            vendor_name: exp.vendorName,
+            date: exp.date,
+            category: exp.accountId,
+            currency: exp.currency || 'USD',
+            currency_symbol: exp.currencySymbol || '$',
+            total_amount: exp.amount,
+            paid_amount: exp.status === 'paid' ? exp.amount : 0,
+            status: exp.status,
+            data: exp,
+            updated_at: new Date().toISOString(),
+          }))
+        );
       }
-      if (jrnRes.data && jrnRes.data.length > 0) {
-        setJournalEntries(jrnRes.data.map(r => r.data as JournalEntry));
-        hasAnyCloudData = true;
+      const finalExpenses = [...cloudExpenses, ...extraLocalExpenses];
+      if (finalExpenses.length > 0 || cloudExpenses.length > 0) {
+        setExpenses(finalExpenses);
       }
-      if (accRes.data && accRes.data.length > 0) {
-        setAccounts(accRes.data.map(r => r.data as Account));
-        hasAnyCloudData = true;
+
+      // 3. Contacts smart sync
+      const cloudContacts = (conRes.data || []).map(r => r.data as Contact);
+      const cloudConIds = new Set(cloudContacts.map(c => c.id));
+      const extraLocalContacts = localContacts.filter(c => !cloudConIds.has(c.id));
+
+      if (extraLocalContacts.length > 0) {
+        await client.from('accounting_contacts').upsert(
+          extraLocalContacts.map(c => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            phone: c.phone || '',
+            currency: c.currency || 'USD',
+            data: c,
+            updated_at: new Date().toISOString(),
+          }))
+        );
       }
+      const finalContacts = [...cloudContacts, ...extraLocalContacts];
+      if (finalContacts.length > 0 || cloudContacts.length > 0) {
+        setContacts(finalContacts);
+      }
+
+      // 4. Journal smart sync
+      const cloudJournal = (jrnRes.data || []).map(r => r.data as JournalEntry);
+      const cloudJrnIds = new Set(cloudJournal.map(j => j.id));
+      const extraLocalJournal = localJournal.filter(j => !cloudJrnIds.has(j.id));
+
+      if (extraLocalJournal.length > 0) {
+        await client.from('accounting_journal').upsert(
+          extraLocalJournal.map(j => ({
+            id: j.id,
+            entry_number: j.entryNumber,
+            date: j.date,
+            description: j.notes || j.entryNumber,
+            currency: j.currency || 'USD',
+            currency_symbol: j.currencySymbol || '$',
+            total_amount: j.lines.reduce((s, l) => s + (Number(l.debit) || 0), 0),
+            data: j,
+            updated_at: new Date().toISOString(),
+          }))
+        );
+      }
+      const finalJournal = [...cloudJournal, ...extraLocalJournal];
+      if (finalJournal.length > 0 || cloudJournal.length > 0) {
+        setJournalEntries(finalJournal);
+      }
+
+      // 5. Accounts sync
+      const cloudAccounts = (accRes.data || []).map(r => r.data as Account);
+      if (cloudAccounts.length > 0) {
+        setAccounts(cloudAccounts);
+      } else if (localAccounts.length > 0) {
+        await client.from('accounting_accounts').upsert(
+          localAccounts.map(a => ({
+            id: a.id,
+            code: a.code,
+            name: a.name,
+            category: a.category,
+            data: a,
+            updated_at: new Date().toISOString(),
+          }))
+        );
+      }
+
+      // 6. Settings sync
       if (setRes.data && setRes.data.length > 0 && setRes.data[0].data) {
         setCompanySettings(setRes.data[0].data as CompanySettings);
-        hasAnyCloudData = true;
+      } else {
+        await client.from('accounting_settings').upsert({
+          id: 'default',
+          data: localSettings,
+          updated_at: new Date().toISOString(),
+        });
       }
 
-      if (!hasAnyCloudData) {
-        await pushAllToCloud();
-      } else {
-        setIsCloudEnabled(true);
-        setCloudSyncStatus('connected');
-        setCloudSyncMessage('متصل بسحابة Supabase ومحدّث بالكامل ✓');
-      }
+      setIsCloudEnabled(true);
+      setCloudSyncStatus('connected');
+      setCloudSyncMessage('متصل بسحابة Supabase ومحدّث بالكامل ✓');
     } catch (err: any) {
       console.error('Error syncing with Supabase:', err);
       setCloudSyncStatus('error');
@@ -363,6 +484,14 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   useEffect(() => {
     refreshFromCloud();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshFromCloud();
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => window.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
 
