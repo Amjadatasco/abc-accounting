@@ -4,7 +4,6 @@ import type { CompanySettings } from '../types/accounting';
 import { 
   getSupabaseConfig, 
   saveSupabaseConfig, 
-  clearSupabaseConfig, 
   testSupabaseConnection 
 } from '../lib/supabaseClient';
 import { SUPABASE_SETUP_SQL } from '../data/supabaseSql';
@@ -13,19 +12,14 @@ export const SettingsView: React.FC = () => {
   const { 
     companySettings, 
     updateCompanySettings, 
-    exportDataJSON, 
-    importDataJSON, 
-    resetToDefaultData,
     cloudSyncStatus,
     cloudSyncMessage,
     isCloudEnabled,
-    refreshFromCloud,
-    pushAllToCloud
+    refreshFromCloud
   } = useAccounting();
 
   const [formData, setFormData] = useState<CompanySettings>(companySettings);
   const [successMsg, setSuccessMsg] = useState('');
-  const [importError, setImportError] = useState('');
 
   // Supabase Cloud Configuration state
   const currentConfig = getSupabaseConfig();
@@ -67,52 +61,10 @@ export const SettingsView: React.FC = () => {
     }
   };
 
-  const handleDisconnectCloud = () => {
-    if (confirm('هل أنت متأكد من رغبتك في قطع الاتصال السحابي والعودة للتخزين المحلي؟')) {
-      clearSupabaseConfig();
-      setSupabaseUrl('');
-      setSupabaseKey('');
-      setCloudTestMsg('');
-      setCloudTestSuccess(null);
-      window.location.reload();
-    }
-  };
-
   const handleCopySql = () => {
     navigator.clipboard.writeText(SUPABASE_SETUP_SQL);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 3000);
-  };
-
-  const handleExportBackup = () => {
-    const json = exportDataJSON();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ABC_Accounting_Backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setImportError('');
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        const ok = importDataJSON(content);
-        if (ok) {
-          alert('تم استرجاع النسخة الاحتياطية وتحديث كافة السجلات المحاسبية بنجاح! ✓');
-        } else {
-          setImportError('ملف النسخة الاحتياطية غير صالح أو تالف.');
-        }
-      }
-    };
-    reader.readAsText(file);
   };
 
   return (
@@ -352,85 +304,7 @@ export const SettingsView: React.FC = () => {
                 </button>
               </div>
 
-              {isCloudEnabled && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-sm btn-outline" 
-                    onClick={() => refreshFromCloud()}
-                    style={{ flex: 1 }}
-                  >
-                    🔄 مزامنة وسحب الآن
-                  </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-sm btn-outline" 
-                    onClick={() => pushAllToCloud()}
-                    style={{ flex: 1 }}
-                  >
-                    ⬆️ رفع البيانات الحالية
-                  </button>
-                  <button 
-                    type="button" 
-                    className="btn btn-sm btn-outline" 
-                    onClick={handleDisconnectCloud}
-                    style={{ color: 'var(--danger-color)' }}
-                  >
-                    قطع الاتصال
-                  </button>
-                </div>
-              )}
             </div>
-
-            <div style={{ marginTop: '0.85rem', padding: '0.65rem 0.85rem', backgroundColor: '#f8fafc', borderRadius: '6px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              💡 <strong>أين تجد هذه البيانات؟</strong> ادخل على <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" style={{ color: 'var(--primary-color)', textDecoration: 'underline' }}>لوحة تحكم Supabase</a> ثم اختر مشروعك ← اضغط <strong>Project Settings</strong> ← اضغط <strong>API</strong> وانسخ الـ URL والـ anon public key.
-            </div>
-          </div>
-
-          <div className="table-card" style={{ padding: '1.75rem', marginBottom: 0 }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
-              النسخ الاحتياطي واستعادة البيانات
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              جميع فواتيرك وقيودك المالية يتم حفظها تلقائياً داخل متصفحك. للحفاظ على بياناتك أو نقلها لجهاز آخر، يمكنك تنزيل نسخة احتياطية مشفرة.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <button className="btn btn-outline" onClick={handleExportBackup} style={{ justifyContent: 'flex-start' }}>
-                💾 تنزيل نسخة احتياطية كاملة (JSON Backup)
-              </button>
-
-              <label className="btn btn-outline" style={{ justifyContent: 'flex-start', cursor: 'pointer' }}>
-                📂 استرجاع نسخة سابقة من ملف
-                <input type="file" accept=".json" onChange={handleFileImport} style={{ display: 'none' }} />
-              </label>
-
-              {importError && (
-                <p style={{ color: 'var(--danger-color)', fontSize: '0.8rem', fontWeight: 600 }}>{importError}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="table-card" style={{ padding: '1.75rem', marginBottom: 0, borderColor: '#fecaca' }}>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--danger-color)', marginBottom: '0.75rem', borderBottom: '1px solid #fee2e2', paddingBottom: '0.75rem' }}>
-              إعادة ضبط البيانات (Reset)
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              إعادة تعيين كافة السجلات لشجرة الحسابات والبيانات الأولية الافتراضية. استخدم هذا الخيار إذا أردت بدء تجربة جديدة.
-            </p>
-
-            <button 
-              className="btn btn-danger" 
-              onClick={async () => {
-                if (confirm('تحذير: هل أنت متأكد من رغبتك في تصفير كافة البيانات وبدء صفحة جديدة تماماً؟ سيتم حذف جميع الفواتير والمصروفات والعملاء.')) {
-                  await resetToDefaultData();
-                  alert('تم تصفير البيانات بنجاح! البرنامج الآن فارغ وجاهز.');
-                  window.location.reload();
-                }
-              }}
-            >
-              🗑️ تصفير كافة البيانات والبدء من الصفر
-            </button>
           </div>
 
         </div>
