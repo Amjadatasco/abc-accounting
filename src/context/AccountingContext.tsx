@@ -6,7 +6,8 @@ import type {
   ExpenseBill, 
   Contact, 
   CompanySettings,
-  Currency
+  Currency,
+  Product
 } from '../types/accounting';
 import { 
   initialAccounts, 
@@ -14,7 +15,8 @@ import {
   initialInvoices, 
   initialExpenses, 
   initialJournalEntries, 
-  initialCompanySettings 
+  initialCompanySettings,
+  initialProducts
 } from '../data/initialData';
 
 import { 
@@ -38,6 +40,7 @@ interface AccountingContextType {
   invoices: Invoice[];
   expenses: ExpenseBill[];
   contacts: Contact[];
+  products: Product[];
   companySettings: CompanySettings;
   
   // Cloud Sync
@@ -62,6 +65,10 @@ interface AccountingContextType {
   addContact: (contact: Omit<Contact, 'id' | 'createdAt'>) => void;
   updateContact: (contact: Contact) => void;
   deleteContact: (id: string) => void;
+  addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => void;
+  updateProduct: (product: Product) => void;
+  deleteProduct: (id: string) => void;
+  adjustProductStock: (productId: string, deltaQuantity: number, reason?: string) => void;
   updateCompanySettings: (settings: CompanySettings) => void;
   resetToDefaultData: () => void;
   exportDataJSON: () => string;
@@ -115,6 +122,11 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return saved ? JSON.parse(saved) : initialContacts;
   });
 
+  const [products, setProducts] = useState<Product[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_products`);
+    return saved ? JSON.parse(saved) : initialProducts;
+  });
+
   const [companySettings, setCompanySettings] = useState<CompanySettings>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_settings`);
     return saved ? JSON.parse(saved) : initialCompanySettings;
@@ -142,6 +154,10 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [contacts]);
 
   useEffect(() => {
+    localStorage.setItem(`${STORAGE_KEY}_products`, JSON.stringify(products));
+  }, [products]);
+
+  useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_settings`, JSON.stringify(companySettings));
   }, [companySettings]);
 
@@ -149,6 +165,21 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'syncing' | 'error'>('disconnected');
   const [cloudSyncMessage, setCloudSyncMessage] = useState<string>('');
   const [isCloudEnabled, setIsCloudEnabled] = useState<boolean>(() => getSupabaseConfig().isConfigured);
+
+  // Background Cloud Sync Helpers (Non-blocking optimistic updates)
+  const syncProductsToCloud = async (productsList: Product[]) => {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('accounting_settings').upsert({
+        id: 'inventory_products',
+        data: productsList,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.warn('Failed to sync products to cloud:', err);
+    }
+  };
 
   // Background Cloud Sync Helpers (Non-blocking optimistic updates)
   const syncRowToCloud = async (table: string, payload: any) => {
@@ -279,6 +310,15 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         );
       }
 
+      // Products
+      if (products.length > 0) {
+        await client.from('accounting_settings').upsert({
+          id: 'inventory_products',
+          data: products,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
       setIsCloudEnabled(true);
       setCloudSyncStatus('connected');
       setCloudSyncMessage('تم حفظ ومزامنة كافة البيانات السحابية بنجاح! ✓');
@@ -317,7 +357,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         client.from('accounting_contacts').select('*'),
         client.from('accounting_journal').select('*').order('date', { ascending: false }),
         client.from('accounting_accounts').select('*').order('code', { ascending: true }),
-        client.from('accounting_settings').select('*').limit(1),
+        client.from('accounting_settings').select('*'),
       ]);
 
       const getLocal = <T,>(key: string, fallback: T): T => {
@@ -332,6 +372,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const localInvoices = getLocal<Invoice[]>('invoices', invoices);
       const localExpenses = getLocal<ExpenseBill[]>('expenses', expenses);
       const localContacts = getLocal<Contact[]>('contacts', contacts);
+      const localProducts = getLocal<Product[]>('products', products);
       const localJournal = getLocal<JournalEntry[]>('journal', journalEntries);
       const localAccounts = getLocal<Account[]>('accounts', accounts);
       const localSettings = getLocal<CompanySettings>('settings', companySettings);
@@ -419,7 +460,31 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setContacts(finalContacts);
       }
 
-      // 4. Journal smart sync
+      // 4. Products smart sync
+      const productsRow = (setRes.data || []).find((r: any) => r.id === 'inventory_products');
+      const cloudProducts = (productsRow?.data as Product[]) || [];
+      const cloudProdIds = new Set(cloudProducts.map(p => p.id));
+      const extraLocalProducts = localProducts.filter(p => !cloudProdIds.has(p.id));
+
+      if (extraLocalProducts.length > 0) {
+        const mergedProd = [...cloudProducts, ...extraLocalProducts];
+        await client.from('accounting_settings').upsert({
+          id: 'inventory_products',
+          data: mergedProd,
+          updated_at: new Date().toISOString(),
+        });
+        setProducts(mergedProd);
+      } else if (cloudProducts.length > 0) {
+        setProducts(cloudProducts);
+      } else if (localProducts.length > 0) {
+        await client.from('accounting_settings').upsert({
+          id: 'inventory_products',
+          data: localProducts,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      // 5. Journal smart sync
       const cloudJournal = (jrnRes.data || []).map(r => r.data as JournalEntry);
       const cloudJrnIds = new Set(cloudJournal.map(j => j.id));
       const extraLocalJournal = localJournal.filter(j => !cloudJrnIds.has(j.id));
@@ -444,7 +509,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setJournalEntries(finalJournal);
       }
 
-      // 5. Accounts sync
+      // 6. Accounts sync
       const cloudAccounts = (accRes.data || []).map(r => r.data as Account);
       if (cloudAccounts.length > 0) {
         setAccounts(cloudAccounts);
@@ -461,9 +526,10 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         );
       }
 
-      // 6. Settings sync
-      if (setRes.data && setRes.data.length > 0 && setRes.data[0].data) {
-        setCompanySettings(setRes.data[0].data as CompanySettings);
+      // 7. Settings sync
+      const settingsRow = (setRes.data || []).find((r: any) => r.id === 'default');
+      if (settingsRow && settingsRow.data) {
+        setCompanySettings(settingsRow.data as CompanySettings);
       } else {
         await client.from('accounting_settings').upsert({
           id: 'default',
@@ -588,6 +654,52 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return { success: true };
   };
 
+  // Product Actions
+  const addProduct = (prodData: Omit<Product, 'id' | 'createdAt'>) => {
+    const id = `prd_${Date.now()}`;
+    const newProduct: Product = {
+      ...prodData,
+      id,
+      createdAt: new Date().toISOString().split('T')[0],
+      updatedAt: new Date().toISOString()
+    };
+    setProducts(prev => {
+      const updated = [newProduct, ...prev];
+      syncProductsToCloud(updated);
+      return updated;
+    });
+  };
+
+  const updateProduct = (updatedProduct: Product) => {
+    setProducts(prev => {
+      const updated = prev.map(p => p.id === updatedProduct.id ? { ...updatedProduct, updatedAt: new Date().toISOString() } : p);
+      syncProductsToCloud(updated);
+      return updated;
+    });
+  };
+
+  const deleteProduct = (id: string) => {
+    setProducts(prev => {
+      const updated = prev.filter(p => p.id !== id);
+      syncProductsToCloud(updated);
+      return updated;
+    });
+  };
+
+  const adjustProductStock = (productId: string, deltaQuantity: number, _reason?: string) => {
+    setProducts(prev => {
+      const updated = prev.map(p => {
+        if (p.id === productId) {
+          const newQty = Math.max(0, (Number(p.quantity) || 0) + deltaQuantity);
+          return { ...p, quantity: newQty, updatedAt: new Date().toISOString() };
+        }
+        return p;
+      });
+      syncProductsToCloud(updated);
+      return updated;
+    });
+  };
+
   // Add Invoice
   const addInvoice = (invoiceData: Omit<Invoice, 'id' | 'createdAt'>) => {
     const currency: Currency = invoiceData.currency || 'USD';
@@ -618,6 +730,13 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       payment_method: newInvoice.paymentMethod || 'cash',
       data: newInvoice,
       updated_at: new Date().toISOString(),
+    });
+
+    // Deduct stock for products sold in this invoice
+    newInvoice.items.forEach(item => {
+      if (item.productId && item.quantity > 0) {
+        adjustProductStock(item.productId, -item.quantity, `خصم مبيعات فاتورة ${newInvoice.invoiceNumber}`);
+      }
     });
 
     // Update contact balance if unpaid or partial
@@ -757,6 +876,15 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const deleteInvoice = (id: string) => {
+    const inv = invoices.find(i => i.id === id);
+    if (inv) {
+      // Restore product stock if any items had productId
+      inv.items.forEach(item => {
+        if (item.productId && item.quantity > 0) {
+          adjustProductStock(item.productId, item.quantity, `استرجاع مخزون بسبب حذف الفاتورة ${inv.invoiceNumber}`);
+        }
+      });
+    }
     setInvoices(prev => prev.filter(inv => inv.id !== id));
     deleteRowFromCloud('accounting_invoices', id);
   };
@@ -1013,12 +1141,14 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setInvoices([]);
     setExpenses([]);
     setContacts([]);
+    setProducts(initialProducts);
     setCompanySettings(initialCompanySettings);
     localStorage.removeItem(`${STORAGE_KEY}_accounts`);
     localStorage.removeItem(`${STORAGE_KEY}_journal`);
     localStorage.removeItem(`${STORAGE_KEY}_invoices`);
     localStorage.removeItem(`${STORAGE_KEY}_expenses`);
     localStorage.removeItem(`${STORAGE_KEY}_contacts`);
+    localStorage.removeItem(`${STORAGE_KEY}_products`);
     localStorage.removeItem(`${STORAGE_KEY}_settings`);
 
     // Wipe from cloud if configured
@@ -1032,6 +1162,12 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           client.from('accounting_journal').delete().neq('id', '___none___'),
           client.from('accounting_accounts').delete().neq('id', '___none___'),
         ]);
+        // Reset products in cloud
+        await client.from('accounting_settings').upsert({
+          id: 'inventory_products',
+          data: initialProducts,
+          updated_at: new Date().toISOString(),
+        });
         // Re-upload zeroed accounts
         await client.from('accounting_accounts').upsert(
           initialAccounts.map(a => ({
@@ -1059,7 +1195,8 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       journalEntries,
       invoices,
       expenses,
-      contacts
+      contacts,
+      products
     };
     return JSON.stringify(fullBackup, null, 2);
   };
@@ -1073,6 +1210,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (data.invoices) setInvoices(data.invoices);
         if (data.expenses) setExpenses(data.expenses);
         if (data.contacts) setContacts(data.contacts);
+        if (data.products) setProducts(data.products);
         if (data.companySettings) setCompanySettings(data.companySettings);
         return true;
       }
@@ -1149,6 +1287,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       invoices,
       expenses,
       contacts,
+      products,
       companySettings,
       cloudSyncStatus,
       cloudSyncMessage,
@@ -1169,6 +1308,10 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addContact,
       updateContact,
       deleteContact,
+      addProduct,
+      updateProduct,
+      deleteProduct,
+      adjustProductStock,
       updateCompanySettings,
       resetToDefaultData,
       exportDataJSON,

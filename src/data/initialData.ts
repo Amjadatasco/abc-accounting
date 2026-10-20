@@ -1,4 +1,4 @@
-import type { Account, Contact, Invoice, JournalEntry, ExpenseBill, CompanySettings } from '../types/accounting';
+import type { Account, Contact, Invoice, JournalEntry, ExpenseBill, CompanySettings, Product } from '../types/accounting';
 
 export const initialCompanySettings: CompanySettings = {
   companyName: 'شركة ABC للخدمات والتجارة',
@@ -822,4 +822,82 @@ export const initialExpenses: ExpenseBill[] = [
 ];
 
 export const initialJournalEntries: JournalEntry[] = [];
+
+export const initialProducts: Product[] = [
+  {
+    id: 'prd_001',
+    name: 'رول ورق كوشيه فاخر (Glossy Paper Roll)',
+    code: 'PRD-101',
+    category: 'أوراق وخامات',
+    costPrice: 28,
+    sellingPrice: 38,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 15,
+    minQuantityAlert: 4,
+    unit: 'رول',
+    notes: 'ورق طباعة كوشيه جودة ممتازة للبروشورات والبوسترات',
+    createdAt: '2026-01-10'
+  },
+  {
+    id: 'prd_002',
+    name: 'كرتون ورق تصوير A4 (Double A)',
+    code: 'PRD-102',
+    category: 'أوراق وخامات',
+    costPrice: 12,
+    sellingPrice: 16,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 30,
+    minQuantityAlert: 5,
+    unit: 'كرتونة',
+    notes: 'كرتونة تحتوي على 5 باكيتات ورق تصوير وزن 80 جرام',
+    createdAt: '2026-01-10'
+  },
+  {
+    id: 'prd_003',
+    name: 'أحبار ليزرية كانون أسود (Canon Toner)',
+    code: 'PRD-103',
+    category: 'أحبار ومستهلكات',
+    costPrice: 45,
+    sellingPrice: 65,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 8,
+    minQuantityAlert: 2,
+    unit: 'علبة',
+    notes: 'حبر ليزر أصلي عالي الإنتاجية',
+    createdAt: '2026-01-12'
+  },
+  {
+    id: 'prd_004',
+    name: 'دفاتر وسجلات فواتير جاهزة (Triplicate)',
+    code: 'PRD-104',
+    category: 'مطبوعات جاهزة',
+    costPrice: 15000,
+    sellingPrice: 22000,
+    currency: 'SYP',
+    currencySymbol: 'ل.س',
+    quantity: 50,
+    minQuantityAlert: 10,
+    unit: 'دفتر',
+    notes: 'دفاتر محاسبية وفواتير 3 نسخ مكربنة',
+    createdAt: '2026-01-15'
+  },
+  {
+    id: 'prd_005',
+    name: 'علب كرتونية شحن وتغليف قياس وسط',
+    code: 'PRD-105',
+    category: 'كرتون وتغليف',
+    costPrice: 3500,
+    sellingPrice: 5000,
+    currency: 'SYP',
+    currencySymbol: 'ل.س',
+    quantity: 120,
+    minQuantityAlert: 25,
+    unit: 'قطعة',
+    notes: 'كرتون مقوى مموج عالي التحمل',
+    createdAt: '2026-01-20'
+  }
+];
 

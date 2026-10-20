@@ -7,11 +7,12 @@ import { JournalView } from './components/JournalView';
 import { InvoicesView } from './components/InvoicesView';
 import { ExpensesView } from './components/ExpensesView';
 import { ContactsView } from './components/ContactsView';
+import { ProductsView } from './components/ProductsView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 
 const MainApp = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'sales' | 'invoices' | 'expenses' | 'contacts' | 'journal' | 'accounts' | 'reports' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'sales' | 'products' | 'invoices' | 'expenses' | 'contacts' | 'journal' | 'accounts' | 'reports' | 'settings'>('dashboard');
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -22,6 +23,7 @@ const MainApp = () => {
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: '📊' },
     { id: 'sales', label: 'المبيعات والخدمات', icon: '🛒' },
+    { id: 'products', label: 'البضائع والمنتجات', icon: '📦' },
     { id: 'invoices', label: 'فواتير المبيعات', icon: '🧾', badge: unpaidCount > 0 ? unpaidCount : undefined, badgeColor: 'badge-orange' },
     { id: 'expenses', label: 'المصروفات والمشتريات', icon: '💳' },
     { id: 'contacts', label: 'العملاء والموردون', icon: '👥' },
@@ -162,6 +164,8 @@ const MainApp = () => {
         )}
 
         {activeTab === 'sales' && <SalesView />}
+
+        {activeTab === 'products' && <ProductsView />}
 
         {activeTab === 'accounts' && <AccountsView />}
 

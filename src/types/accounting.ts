@@ -37,11 +37,29 @@ export interface JournalEntry {
 
 export interface InvoiceItem {
   id: string;
+  productId?: string;
   description: string;
   quantity: number;
   unitPrice: number;
   taxRate: number; // percentage e.g. 15 or 0
   total: number;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  code?: string;
+  category: string;
+  costPrice: number;
+  sellingPrice: number;
+  currency: Currency;
+  currencySymbol: string;
+  quantity: number; // Current stock available
+  minQuantityAlert?: number; // Low stock threshold
+  unit?: string; // قطعة, كرتونة, رول, متر, إلخ
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface Invoice {

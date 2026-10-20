@@ -8,7 +8,7 @@ interface SalesViewProps {
 }
 
 export const SalesView: React.FC<SalesViewProps> = () => {
-  const { invoices, contacts, addInvoice, markInvoicePaid, deleteInvoice, addContact } = useAccounting();
+  const { invoices, contacts, products, addInvoice, markInvoicePaid, deleteInvoice, addContact } = useAccounting();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,6 +21,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
 
   // New Sale Form
   const [saleType, setSaleType] = useState<'service' | 'product'>('service');
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [currency, setCurrency] = useState<Currency>('USD');
   const [customerName, setCustomerName] = useState('');
   const [itemDescription, setItemDescription] = useState('');
@@ -34,6 +35,21 @@ export const SalesView: React.FC<SalesViewProps> = () => {
   const [notes, setNotes] = useState('');
 
   const currSym = currency === 'SYP' ? 'ل.س' : '$';
+
+  const selectedProduct = products.find(p => p.id === selectedProductId);
+
+  const handleProductSelect = (id: string) => {
+    setSelectedProductId(id);
+    if (!id) return;
+    const p = products.find(prod => prod.id === id);
+    if (p) {
+      setItemDescription(p.name);
+      setCurrency(p.currency);
+      setUnitPrice(String(p.sellingPrice));
+      const q = parseFloat(quantity) || 1;
+      setTotalAmountInput(formatNumberClean(p.sellingPrice * q));
+    }
+  };
 
   // Smart Bidirectional Calculation:
   // When quantity changes: update total if unitPrice exists, or update unitPrice if total exists
@@ -129,6 +145,16 @@ export const SalesView: React.FC<SalesViewProps> = () => {
       return;
     }
 
+    // Check stock warning if selling a product
+    if (saleType === 'product' && selectedProductId) {
+      const prod = products.find(p => p.id === selectedProductId);
+      if (prod && qtyNum > prod.quantity) {
+        if (!confirm(`تنبيه: الكمية المطلوبة (${qtyNum}) أكبر من المتوفر حالياً بالمخزن (${prod.quantity} ${prod.unit || 'قطعة'}). هل ترغب في متابعة البيع وتخفيض الرصيد؟`)) {
+          return;
+        }
+      }
+    }
+
     // Auto-save customer if new
     const existingCust = contacts.find(c => c.name.trim().toLowerCase() === custTrimmed.toLowerCase());
     const finalCustomerId = existingCust?.id || `cnt_${Date.now()}`;
@@ -173,6 +199,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
       items: [
         {
           id: `item_${Date.now()}`,
+          productId: saleType === 'product' && selectedProductId ? selectedProductId : undefined,
           description: itemTrimmed,
           quantity: qtyNum,
           unitPrice: priceNum,
@@ -205,6 +232,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
     // Reset Form
     setCustomerName('');
     setItemDescription('');
+    setSelectedProductId('');
     setQuantity('1');
     setUnitPrice('');
     setTotalAmountInput('');
@@ -250,9 +278,20 @@ export const SalesView: React.FC<SalesViewProps> = () => {
           <h2>سجل المبيعات والخدمات (Sales & Services)</h2>
           <p>تسجيل مبيعات الخدمات والمنتجات اليومية بسهولة وسرعة مع إدارة التحصيل الفوري والآجل</p>
         </div>
-        <div className="header-actions">
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ padding: '0.65rem 1.25rem', fontSize: '0.95rem', fontWeight: 800 }}>
-            <span>+</span> تسجيل بيع خدمة أو منتج جديد
+        <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={() => { setSaleType('product'); setSelectedProductId(''); setIsModalOpen(true); }}
+            style={{ padding: '0.65rem 1.15rem', fontSize: '0.9rem', fontWeight: 800, backgroundColor: '#059669', borderColor: '#059669' }}
+          >
+            <span>📦</span> بيع بضاعة من المخزن
+          </button>
+          <button 
+            className="btn btn-outline" 
+            onClick={() => { setSaleType('service'); setSelectedProductId(''); setIsModalOpen(true); }}
+            style={{ padding: '0.65rem 1.15rem', fontSize: '0.9rem', fontWeight: 800 }}
+          >
+            <span>🛠️</span> بيع خدمة أو طباعة
           </button>
         </div>
       </div>
@@ -358,7 +397,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                   style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
                   onClick={() => setFilterType('product')}
                 >
-                  📦 منتجات
+                  📦 بضائع ومنتجات
                 </button>
               </div>
             </div>
@@ -666,7 +705,48 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                   </div>
                 </div>
 
-                {/* 4. Item Description with Quick Presets */}
+                {/* 4. Product Selection or Service Description */}
+                {saleType === 'product' && (
+                  <div className="form-group" style={{ marginBottom: '1rem', padding: '0.85rem 1rem', backgroundColor: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 'var(--radius-md)' }}>
+                    <label className="form-label" style={{ fontWeight: 800, color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>📦 اختر البضاعة من المخزن</span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#15803d' }}>
+                        (يتم خصم الكمية من صفحة البضائع تلقائياً)
+                      </span>
+                    </label>
+                    <select
+                      className="form-select"
+                      value={selectedProductId}
+                      onChange={(e) => handleProductSelect(e.target.value)}
+                      style={{ fontWeight: 700, backgroundColor: '#ffffff', borderColor: '#86efac' }}
+                    >
+                      <option value="">-- اختر البضاعة من قائمة المخزن (لتعبئة السعر وخصم الكمية) --</option>
+                      {products.map(p => {
+                        const sym = p.currencySymbol || (p.currency === 'SYP' ? 'ل.س' : '$');
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} (المتوفر: {p.quantity} {p.unit || 'قطعة'} — السعر: {sym} {p.sellingPrice.toLocaleString()})
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {selectedProduct && (
+                      <div style={{ marginTop: '0.6rem', padding: '0.45rem 0.65rem', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #dcfce7', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div>
+                          الرصيد المتوفر بالمخزن: <strong style={{ color: selectedProduct.quantity > (selectedProduct.minQuantityAlert || 5) ? '#16a34a' : '#d97706', fontSize: '0.95rem' }}>{selectedProduct.quantity} {selectedProduct.unit || 'قطعة'}</strong>
+                          {selectedProduct.category && <span style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>({selectedProduct.category})</span>}
+                        </div>
+                        {parseFloat(quantity) > selectedProduct.quantity && (
+                          <span style={{ color: '#dc2626', fontWeight: 800 }}>
+                            ⚠️ الكمية المطلوبة أكبر من المتوفر بالمخزن!
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">
                     {saleType === 'service' ? 'بيان الخدمة المقدمة للعميل *' : 'بيان الصنف أو المنتج المباع *'}
@@ -689,7 +769,11 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                         type="button"
                         className="btn btn-sm btn-outline"
                         style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '15px' }}
-                        onClick={() => setItemDescription(preset)}
+                        onClick={() => {
+                          setItemDescription(preset);
+                          const matchingP = products.find(p => p.name.includes(preset) || preset.includes(p.name));
+                          if (matchingP) handleProductSelect(matchingP.id);
+                        }}
                       >
                         + {preset}
                       </button>
