@@ -35,6 +35,61 @@ export interface JournalEntry {
   createdAt: string;
 }
 
+export type ProductionSource = 'uv' | 'dtf' | 'external' | 'general';
+
+export interface ProductionSourceInfo {
+  id: ProductionSource;
+  label: string;
+  icon: string;
+  description: string;
+  badgeBg: string;
+  badgeColor: string;
+  badgeBorder: string;
+}
+
+export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
+  {
+    id: 'uv',
+    label: 'ماكينة UV',
+    icon: '🖨️',
+    description: 'طباعة مسطحة / أسطح صلبة وأكريليك وخشب وهدايا',
+    badgeBg: '#ede9fe',
+    badgeColor: '#6d28d9',
+    badgeBorder: '#c4b5fd'
+  },
+  {
+    id: 'dtf',
+    label: 'ماكينة DTF',
+    icon: '👕',
+    description: 'طباعة حرارية للملابس والأقمشة والتيشرتات والأعلام',
+    badgeBg: '#d1fae5',
+    badgeColor: '#047857',
+    badgeBorder: '#6ee7b7'
+  },
+  {
+    id: 'external',
+    label: 'مصدر خارجي',
+    icon: '🌐',
+    description: 'تنفيذ لدى ورش ومطابع خارجية أو موردين معتمدين',
+    badgeBg: '#fef3c7',
+    badgeColor: '#b45309',
+    badgeBorder: '#fcd34d'
+  },
+  {
+    id: 'general',
+    label: 'بضاعة عامة / أخرى',
+    icon: '📦',
+    description: 'مبيعات المخزن الجاهزة أو خدمات عامة متنوعة',
+    badgeBg: '#f1f5f9',
+    badgeColor: '#475569',
+    badgeBorder: '#cbd5e1'
+  }
+];
+
+export const getProductionSourceDetails = (source?: ProductionSource): ProductionSourceInfo => {
+  return PRODUCTION_SOURCES.find(s => s.id === source) || PRODUCTION_SOURCES[3];
+};
+
 export interface InvoiceItem {
   id: string;
   productId?: string;
@@ -43,6 +98,7 @@ export interface InvoiceItem {
   unitPrice: number;
   taxRate: number; // percentage e.g. 15 or 0
   total: number;
+  productionSource?: ProductionSource;
 }
 
 export interface Product {
@@ -76,6 +132,7 @@ export interface Invoice {
   currency?: Currency;
   currencySymbol?: string;
   saleType?: 'service' | 'product';
+  productionSource?: ProductionSource;
   paymentMethod?: 'cash' | 'bank' | 'sham_cash' | 'credit';
   status: 'paid' | 'partial' | 'unpaid';
   paidAmount: number;

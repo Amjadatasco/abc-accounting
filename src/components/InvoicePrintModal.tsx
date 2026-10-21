@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Invoice } from '../types/accounting';
+import { getProductionSourceDetails } from '../types/accounting';
 import { useAccounting } from '../context/AccountingContext';
 
 interface InvoicePrintModalProps {
@@ -75,6 +76,14 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({ invoice, o
               {customer?.taxNumber && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>الرقم الضريبي: {customer.taxNumber}</p>}
               {customer?.phone && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>الهاتف: {customer.phone}</p>}
               {customer?.address && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>العنوان: {customer.address}</p>}
+              {invoice.productionSource && (
+                <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>بند التنفيذ:</span>
+                  <span style={{ fontWeight: 700, color: getProductionSourceDetails(invoice.productionSource).badgeColor }}>
+                    {getProductionSourceDetails(invoice.productionSource).icon} {getProductionSourceDetails(invoice.productionSource).label}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div style={{ textAlign: 'left' }}>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAccounting } from '../context/AccountingContext';
-import type { Invoice, InvoiceItem, Currency } from '../types/accounting';
+import type { Invoice, InvoiceItem, Currency, ProductionSource } from '../types/accounting';
+import { PRODUCTION_SOURCES, getProductionSourceDetails } from '../types/accounting';
 import { InvoicePrintModal } from './InvoicePrintModal';
 
 interface InvoicesViewProps {
@@ -25,6 +26,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
 
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterSource, setFilterSource] = useState<'all' | ProductionSource>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -32,6 +34,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   // New Invoice Form
   const [invoiceCurrency, setInvoiceCurrency] = useState<Currency>('USD');
+  const [invoiceSource, setInvoiceSource] = useState<ProductionSource>('uv');
   const formCurrSym = invoiceCurrency === 'SYP' ? 'ل.س' : '$';
   const [customerNameInput, setCustomerNameInput] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -120,12 +123,13 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
       customerName: nameTrimmed,
       date,
       dueDate,
-      items: items.map((it, idx) => ({ ...it, id: `item_${idx}_${Date.now()}` })),
+      items: items.map((it, idx) => ({ ...it, id: `item_${idx}_${Date.now()}`, productionSource: invoiceSource })),
       subtotal,
       taxAmount: totalTax,
       totalAmount: grandTotal,
       currency: invoiceCurrency,
       currencySymbol: formCurrSym,
+      productionSource: invoiceSource,
       status,
       paidAmount: paid,
       notes
@@ -133,6 +137,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
 
     // Reset
     setInvoiceCurrency('USD');
+    setInvoiceSource('uv');
     setCustomerNameInput('');
     setItems([{ description: '', quantity: 1, unitPrice: 0, taxRate: 0, total: 0 }]);
     setNotes('');
@@ -142,10 +147,11 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   const filteredInvoices = invoices.filter(inv => {
     const matchesFilter = filterStatus === 'all' || inv.status === filterStatus;
+    const matchesSource = filterSource === 'all' || (inv.productionSource || 'general') === filterSource;
     const matchesSearch = inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           inv.customerName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDate = (!filterStartDate || inv.date >= filterStartDate) && (!filterEndDate || inv.date <= filterEndDate);
-    return matchesFilter && matchesSearch && matchesDate;
+    return matchesFilter && matchesSource && matchesSearch && matchesDate;
   });
 
   return (
@@ -165,7 +171,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
       {/* Filter and Search */}
       <div className="table-card" style={{ padding: '1rem 1.5rem', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {[
               { id: 'all', label: 'كافة الفواتير' },
               { id: 'paid', label: 'المسددة بالكامل' },
@@ -180,6 +186,37 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                 {tab.label}
               </button>
             ))}
+
+            <div style={{ display: 'flex', gap: '0.25rem', marginRight: '0.5rem' }}>
+              <button 
+                onClick={() => setFilterSource('all')}
+                className={`btn btn-sm ${filterSource === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+              >
+                الكل
+              </button>
+              <button 
+                onClick={() => setFilterSource('uv')}
+                className={`btn btn-sm ${filterSource === 'uv' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', ...(filterSource === 'uv' ? { backgroundColor: '#7c3aed', borderColor: '#7c3aed' } : {}) }}
+              >
+                🖨️ UV
+              </button>
+              <button 
+                onClick={() => setFilterSource('dtf')}
+                className={`btn btn-sm ${filterSource === 'dtf' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', ...(filterSource === 'dtf' ? { backgroundColor: '#059669', borderColor: '#059669' } : {}) }}
+              >
+                👕 DTF
+              </button>
+              <button 
+                onClick={() => setFilterSource('external')}
+                className={`btn btn-sm ${filterSource === 'external' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', ...(filterSource === 'external' ? { backgroundColor: '#d97706', borderColor: '#d97706' } : {}) }}
+              >
+                🌐 خارجي
+              </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -200,11 +237,11 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                 value={filterEndDate} 
                 onChange={(e) => setFilterEndDate(e.target.value)} 
               />
-              {(filterStartDate || filterEndDate) && (
+              {(filterStartDate || filterEndDate || filterSource !== 'all') && (
                 <button 
                   className="btn btn-sm btn-outline" 
                   style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} 
-                  onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }}
+                  onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterSource('all'); }}
                 >
                   ✕ مسح
                 </button>
@@ -234,6 +271,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
             <thead>
               <tr>
                 <th>رقم الفاتورة</th>
+                <th style={{ width: '115px', textAlign: 'center' }}>بند التنفيذ</th>
                 <th>العميل</th>
                 <th>تاريخ الإصدار</th>
                 <th>تاريخ الاستحقاق</th>
@@ -249,11 +287,27 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                 const remaining = inv.totalAmount - inv.paidAmount;
                 const invSym = inv.currencySymbol || (inv.currency === 'SYP' ? 'ل.س' : '$');
                 const isSyp = inv.currency === 'SYP';
+                const srcInfo = getProductionSourceDetails(inv.productionSource);
 
                 return (
                   <tr key={inv.id}>
                     <td style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
                       {inv.invoiceNumber}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span 
+                        className="badge" 
+                        style={{ 
+                          backgroundColor: srcInfo.badgeBg, 
+                          color: srcInfo.badgeColor, 
+                          border: `1px solid ${srcInfo.badgeBorder}`,
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {srcInfo.icon} {srcInfo.label}
+                      </span>
                     </td>
                     <td style={{ fontWeight: 600 }}>{inv.customerName}</td>
                     <td style={{ fontSize: '0.85rem' }}>{inv.date}</td>
@@ -365,6 +419,52 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                     >
                       🇸🇾 ليرة سورية (ل.س)
                     </button>
+                  </div>
+                </div>
+
+                {/* Production Source Selector */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label className="form-label" style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                    <span>🏭 بند ومصدر تنفيذ الفاتورة *</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      (حدد الماكينة أو المصدر المنفذ للعملية)
+                    </span>
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.65rem' }}>
+                    {PRODUCTION_SOURCES.map(src => {
+                      const isSelected = invoiceSource === src.id;
+                      return (
+                        <button
+                          key={src.id}
+                          type="button"
+                          onClick={() => setInvoiceSource(src.id)}
+                          style={{
+                            padding: '0.65rem 0.75rem',
+                            borderRadius: '8px',
+                            textAlign: 'right',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.2rem',
+                            transition: 'all 0.15s ease-in-out',
+                            backgroundColor: isSelected ? src.badgeBg : '#ffffff',
+                            color: isSelected ? src.badgeColor : 'var(--text-dark)',
+                            border: `2px solid ${isSelected ? src.badgeColor : '#e2e8f0'}`,
+                            boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <span style={{ fontWeight: 800, fontSize: '0.88rem' }}>
+                              {src.icon} {src.label}
+                            </span>
+                            {isSelected && <span style={{ fontSize: '0.85rem', fontWeight: 900 }}>✓</span>}
+                          </div>
+                          <span style={{ fontSize: '0.7rem', color: isSelected ? src.badgeColor : 'var(--text-muted)', lineHeight: 1.3 }}>
+                            {src.description}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

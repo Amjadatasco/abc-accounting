@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAccounting } from '../context/AccountingContext';
-import type { Invoice, Currency } from '../types/accounting';
+import type { Invoice, Currency, ProductionSource } from '../types/accounting';
+import { PRODUCTION_SOURCES, getProductionSourceDetails } from '../types/accounting';
 import { InvoicePrintModal } from './InvoicePrintModal';
 
 interface SalesViewProps {
@@ -14,6 +15,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCurrency, setFilterCurrency] = useState<'all' | 'USD' | 'SYP'>('all');
   const [filterType, setFilterType] = useState<'all' | 'service' | 'product'>('all');
+  const [filterSource, setFilterSource] = useState<'all' | ProductionSource>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
@@ -21,6 +23,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
 
   // New Sale Form
   const [saleType, setSaleType] = useState<'service' | 'product'>('service');
+  const [productionSource, setProductionSource] = useState<ProductionSource>('uv');
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [currency, setCurrency] = useState<Currency>('USD');
   const [customerName, setCustomerName] = useState('');
@@ -204,7 +207,8 @@ export const SalesView: React.FC<SalesViewProps> = () => {
           quantity: qtyNum,
           unitPrice: priceNum,
           taxRate: 0,
-          total: totalAmount
+          total: totalAmount,
+          productionSource
         }
       ],
       subtotal: totalAmount,
@@ -213,6 +217,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
       currency,
       currencySymbol: currSym,
       saleType,
+      productionSource,
       paymentMethod,
       status: finalStatus,
       paidAmount,
@@ -233,6 +238,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
     setCustomerName('');
     setItemDescription('');
     setSelectedProductId('');
+    setProductionSource('uv');
     setQuantity('1');
     setUnitPrice('');
     setTotalAmountInput('');
@@ -250,12 +256,13 @@ export const SalesView: React.FC<SalesViewProps> = () => {
 
     const matchesCurrency = filterCurrency === 'all' || (inv.currency || 'USD') === filterCurrency;
     const matchesType = filterType === 'all' || (inv.saleType || 'service') === filterType;
+    const matchesSource = filterSource === 'all' || (inv.productionSource || 'general') === filterSource;
     const matchesStatus = filterStatus === 'all' || 
                           (filterStatus === 'paid' && inv.status === 'paid') ||
                           (filterStatus === 'unpaid' && inv.status !== 'paid');
     const matchesDate = (!filterStartDate || inv.date >= filterStartDate) && (!filterEndDate || inv.date <= filterEndDate);
 
-    return matchesSearch && matchesCurrency && matchesType && matchesStatus && matchesDate;
+    return matchesSearch && matchesCurrency && matchesType && matchesSource && matchesStatus && matchesDate;
   });
 
   // KPI Calculations
@@ -270,6 +277,20 @@ export const SalesView: React.FC<SalesViewProps> = () => {
   const paidSYP = salesSYP.reduce((s, i) => s + i.paidAmount, 0);
   const unpaidSYP = totalSYP - paidSYP;
 
+  // Source-based revenue breakdown
+  const uvSales = invoices.filter(i => (i.productionSource || 'general') === 'uv');
+  const dtfSales = invoices.filter(i => (i.productionSource || 'general') === 'dtf');
+  const extSales = invoices.filter(i => (i.productionSource || 'general') === 'external');
+
+  const uvUSD = uvSales.filter(i => (i.currency || 'USD') === 'USD').reduce((s, i) => s + i.totalAmount, 0);
+  const uvSYP = uvSales.filter(i => (i.currency || 'USD') === 'SYP').reduce((s, i) => s + i.totalAmount, 0);
+
+  const dtfUSD = dtfSales.filter(i => (i.currency || 'USD') === 'USD').reduce((s, i) => s + i.totalAmount, 0);
+  const dtfSYP = dtfSales.filter(i => (i.currency || 'USD') === 'SYP').reduce((s, i) => s + i.totalAmount, 0);
+
+  const extUSD = extSales.filter(i => (i.currency || 'USD') === 'USD').reduce((s, i) => s + i.totalAmount, 0);
+  const extSYP = extSales.filter(i => (i.currency || 'USD') === 'SYP').reduce((s, i) => s + i.totalAmount, 0);
+
   return (
     <div>
       {/* Top Header */}
@@ -281,14 +302,14 @@ export const SalesView: React.FC<SalesViewProps> = () => {
         <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button 
             className="btn btn-primary" 
-            onClick={() => { setSaleType('product'); setSelectedProductId(''); setIsModalOpen(true); }}
+            onClick={() => { setSaleType('product'); setSelectedProductId(''); setProductionSource('general'); setIsModalOpen(true); }}
             style={{ padding: '0.65rem 1.15rem', fontSize: '0.9rem', fontWeight: 800, backgroundColor: '#059669', borderColor: '#059669' }}
           >
             <span>📦</span> بيع بضاعة من المخزن
           </button>
           <button 
             className="btn btn-outline" 
-            onClick={() => { setSaleType('service'); setSelectedProductId(''); setIsModalOpen(true); }}
+            onClick={() => { setSaleType('service'); setSelectedProductId(''); setProductionSource('uv'); setIsModalOpen(true); }}
             style={{ padding: '0.65rem 1.15rem', fontSize: '0.9rem', fontWeight: 800 }}
           >
             <span>🛠️</span> بيع خدمة أو طباعة
@@ -297,7 +318,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
       </div>
 
       {/* Main KPI Stats Row */}
-      <div className="stats-grid" style={{ marginBottom: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
+      <div className="stats-grid" style={{ marginBottom: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
         <div className="stat-card" style={{ borderRight: '4px solid #2563eb' }}>
           <div className="stat-header">
             <span className="stat-title">إجمالي المبيعات بالدولار</span>
@@ -336,6 +357,87 @@ export const SalesView: React.FC<SalesViewProps> = () => {
           </div>
           <div className="stat-footer">
             <span>تشمل مبيعات الخدمات والمنتجات للعملاء</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Production Source Revenue Breakdown Cards (Quick Filters) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem', marginBottom: '1.5rem' }}>
+        <div 
+          onClick={() => setFilterSource(filterSource === 'uv' ? 'all' : 'uv')}
+          style={{ 
+            padding: '0.85rem 1.15rem', 
+            backgroundColor: filterSource === 'uv' ? '#ede9fe' : '#faf5ff', 
+            border: `2px solid ${filterSource === 'uv' ? '#7c3aed' : '#ddd6fe'}`, 
+            borderRadius: '10px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: filterSource === 'uv' ? '0 3px 8px rgba(124,58,237,0.18)' : 'none'
+          }}
+          title="انقر لتصفية مبيعات ماكينة الـ UV"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 800, color: '#6d28d9', fontSize: '0.95rem' }}>🖨️ ماكينة UV</span>
+            <span className="badge" style={{ backgroundColor: '#ede9fe', color: '#6d28d9', fontSize: '0.75rem', fontWeight: 800 }}>{uvSales.length} مبيعات</span>
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#5b21b6' }}>
+            $ {uvUSD.toLocaleString()} {uvSYP > 0 && <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#7c3aed' }}>+ {uvSYP.toLocaleString()} ل.س</span>}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#7c3aed', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
+            <span>طباعة مسطحة / أسطح صلبة</span>
+            {filterSource === 'uv' && <strong style={{ color: '#6d28d9' }}>محدد ✓</strong>}
+          </div>
+        </div>
+
+        <div 
+          onClick={() => setFilterSource(filterSource === 'dtf' ? 'all' : 'dtf')}
+          style={{ 
+            padding: '0.85rem 1.15rem', 
+            backgroundColor: filterSource === 'dtf' ? '#d1fae5' : '#f0fdf4', 
+            border: `2px solid ${filterSource === 'dtf' ? '#059669' : '#a7f3d0'}`, 
+            borderRadius: '10px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: filterSource === 'dtf' ? '0 3px 8px rgba(5,150,105,0.18)' : 'none'
+          }}
+          title="انقر لتصفية مبيعات ماكينة الـ DTF"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 800, color: '#047857', fontSize: '0.95rem' }}>👕 ماكينة DTF</span>
+            <span className="badge" style={{ backgroundColor: '#d1fae5', color: '#047857', fontSize: '0.75rem', fontWeight: 800 }}>{dtfSales.length} مبيعات</span>
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#065f46' }}>
+            $ {dtfUSD.toLocaleString()} {dtfSYP > 0 && <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#059669' }}>+ {dtfSYP.toLocaleString()} ل.س</span>}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#059669', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
+            <span>طباعة أقمشة وملابس وتيشرتات</span>
+            {filterSource === 'dtf' && <strong style={{ color: '#047857' }}>محدد ✓</strong>}
+          </div>
+        </div>
+
+        <div 
+          onClick={() => setFilterSource(filterSource === 'external' ? 'all' : 'external')}
+          style={{ 
+            padding: '0.85rem 1.15rem', 
+            backgroundColor: filterSource === 'external' ? '#fef3c7' : '#fffbeb', 
+            border: `2px solid ${filterSource === 'external' ? '#d97706' : '#fde68a'}`, 
+            borderRadius: '10px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: filterSource === 'external' ? '0 3px 8px rgba(217,119,6,0.18)' : 'none'
+          }}
+          title="انقر لتصفية مبيعات المصدر الخارجي"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 800, color: '#b45309', fontSize: '0.95rem' }}>🌐 مصدر خارجي</span>
+            <span className="badge" style={{ backgroundColor: '#fef3c7', color: '#b45309', fontSize: '0.75rem', fontWeight: 800 }}>{extSales.length} مبيعات</span>
+          </div>
+          <div style={{ fontSize: '1.15rem', fontWeight: 900, color: '#92400e' }}>
+            $ {extUSD.toLocaleString()} {extSYP > 0 && <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#d97706' }}>+ {extSYP.toLocaleString()} ل.س</span>}
+          </div>
+          <div style={{ fontSize: '0.72rem', color: '#d97706', marginTop: '0.25rem', display: 'flex', justifyContent: 'space-between' }}>
+            <span>تنفيذ ورش ومطابع خارجية (Outsource)</span>
+            {filterSource === 'external' && <strong style={{ color: '#b45309' }}>محدد ✓</strong>}
           </div>
         </div>
       </div>
@@ -402,6 +504,53 @@ export const SalesView: React.FC<SalesViewProps> = () => {
               </div>
             </div>
 
+            {/* Production Source Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>المصدر:</span>
+              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                <button 
+                  className={`btn btn-sm ${filterSource === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }}
+                  onClick={() => setFilterSource('all')}
+                >
+                  الكل
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterSource === 'uv' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.55rem', 
+                    fontSize: '0.75rem',
+                    ...(filterSource === 'uv' ? { backgroundColor: '#7c3aed', borderColor: '#7c3aed' } : {})
+                  }}
+                  onClick={() => setFilterSource('uv')}
+                >
+                  🖨️ UV
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterSource === 'dtf' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.55rem', 
+                    fontSize: '0.75rem',
+                    ...(filterSource === 'dtf' ? { backgroundColor: '#059669', borderColor: '#059669' } : {})
+                  }}
+                  onClick={() => setFilterSource('dtf')}
+                >
+                  👕 DTF
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterSource === 'external' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.55rem', 
+                    fontSize: '0.75rem',
+                    ...(filterSource === 'external' ? { backgroundColor: '#d97706', borderColor: '#d97706' } : {})
+                  }}
+                  onClick={() => setFilterSource('external')}
+                >
+                  🌐 خارجي
+                </button>
+              </div>
+            </div>
+
             {/* Status Filter */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>السداد:</span>
@@ -448,7 +597,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                 value={filterEndDate}
                 onChange={(e) => setFilterEndDate(e.target.value)}
               />
-              {(filterStartDate || filterEndDate || filterCurrency !== 'all' || filterType !== 'all' || filterStatus !== 'all') && (
+              {(filterStartDate || filterEndDate || filterCurrency !== 'all' || filterType !== 'all' || filterSource !== 'all' || filterStatus !== 'all') && (
                 <button 
                   className="btn btn-sm btn-outline" 
                   style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
@@ -457,6 +606,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                     setFilterEndDate('');
                     setFilterCurrency('all');
                     setFilterType('all');
+                    setFilterSource('all');
                     setFilterStatus('all');
                   }}
                 >
@@ -492,21 +642,22 @@ export const SalesView: React.FC<SalesViewProps> = () => {
             <thead>
               <tr>
                 <th style={{ width: '120px' }}>رقم العملية</th>
-                <th style={{ width: '100px' }}>التاريخ</th>
-                <th style={{ width: '90px', textAlign: 'center' }}>النوع</th>
+                <th style={{ width: '95px' }}>التاريخ</th>
+                <th style={{ width: '120px', textAlign: 'center' }}>بند التنفيذ</th>
+                <th style={{ width: '85px', textAlign: 'center' }}>النوع</th>
                 <th>الخدمة / المنتج المباع</th>
                 <th>العميل</th>
                 <th>طريقة الدفع</th>
-                <th style={{ textAlign: 'center', width: '100px' }}>العملة</th>
-                <th style={{ textAlign: 'left', width: '130px' }}>المبلغ الإجمالي</th>
-                <th style={{ textAlign: 'center', width: '110px' }}>حالة السداد</th>
+                <th style={{ textAlign: 'center', width: '90px' }}>العملة</th>
+                <th style={{ textAlign: 'left', width: '125px' }}>المبلغ الإجمالي</th>
+                <th style={{ textAlign: 'center', width: '105px' }}>حالة السداد</th>
                 <th style={{ textAlign: 'center', width: '130px' }}>إجراءات</th>
               </tr>
             </thead>
             <tbody>
               {filteredSales.length === 0 ? (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  <td colSpan={11} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                     لا توجد عمليات مبيعات مطابقة لمعايير البحث. انقر على "+ تسجيل بيع خدمة أو منتج جديد" لإضافة مبيعات جديدة.
                   </td>
                 </tr>
@@ -516,6 +667,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                   const isSyp = sale.currency === 'SYP';
                   const remaining = sale.totalAmount - sale.paidAmount;
                   const firstItem = sale.items[0]?.description || sale.notes || 'خدمة مبيعات';
+                  const srcInfo = getProductionSourceDetails(sale.productionSource);
 
                   return (
                     <tr key={sale.id}>
@@ -523,6 +675,21 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                         {sale.invoiceNumber}
                       </td>
                       <td style={{ fontSize: '0.85rem' }}>{sale.date}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span 
+                          className="badge" 
+                          style={{ 
+                            backgroundColor: srcInfo.badgeBg, 
+                            color: srcInfo.badgeColor, 
+                            border: `1px solid ${srcInfo.badgeBorder}`,
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {srcInfo.icon} {srcInfo.label}
+                        </span>
+                      </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={`badge ${sale.saleType === 'product' ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '0.75rem' }}>
                           {sale.saleType === 'product' ? '📦 منتج' : '🛠️ خدمة'}
@@ -655,7 +822,7 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                       type="button"
                       className={`btn ${saleType === 'service' ? 'btn-primary' : 'btn-outline'}`}
                       style={{ padding: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                      onClick={() => setSaleType('service')}
+                      onClick={() => { setSaleType('service'); if (productionSource === 'general') setProductionSource('uv'); }}
                     >
                       <span>🛠️</span> تقديم خدمة (طباعة / تصميم / تنفيذ)
                     </button>
@@ -667,6 +834,52 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                     >
                       <span>📦</span> بيع منتج جاهز (ورق / أحبار / رول / كروت)
                     </button>
+                  </div>
+                </div>
+
+                {/* 2.5 Production Source Selection */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label className="form-label" style={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                    <span>🏭 بند ومصدر تنفيذ المبيعات *</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      (حدد الماكينة أو المصدر المنفذ للعملية)
+                    </span>
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.65rem' }}>
+                    {PRODUCTION_SOURCES.map(src => {
+                      const isSelected = productionSource === src.id;
+                      return (
+                        <button
+                          key={src.id}
+                          type="button"
+                          onClick={() => setProductionSource(src.id)}
+                          style={{
+                            padding: '0.7rem 0.85rem',
+                            borderRadius: '8px',
+                            textAlign: 'right',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.25rem',
+                            transition: 'all 0.15s ease-in-out',
+                            backgroundColor: isSelected ? src.badgeBg : '#ffffff',
+                            color: isSelected ? src.badgeColor : 'var(--text-dark)',
+                            border: `2px solid ${isSelected ? src.badgeColor : '#e2e8f0'}`,
+                            boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                              {src.icon} {src.label}
+                            </span>
+                            {isSelected && <span style={{ fontSize: '0.9rem', fontWeight: 900 }}>✓</span>}
+                          </div>
+                          <span style={{ fontSize: '0.72rem', color: isSelected ? src.badgeColor : 'var(--text-muted)', lineHeight: 1.3 }}>
+                            {src.description}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
