@@ -160,20 +160,19 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
+    const oldIds = new Set(['prd_001', 'prd_002', 'prd_003', 'prd_004', 'prd_005']);
     const saved = localStorage.getItem(`${STORAGE_KEY}_products`);
-    if (!saved) return initialProducts;
+    if (!saved) return initialProducts.filter(p => !oldIds.has(p.id));
     try {
       const parsed: Product[] = JSON.parse(saved);
-      const existingIds = new Set(parsed.map(p => p.id));
-      const missing = initialProducts.filter(p => !existingIds.has(p.id));
-      if (missing.length > 0) {
-        const merged = [...parsed, ...missing];
-        localStorage.setItem(`${STORAGE_KEY}_products`, JSON.stringify(merged));
-        return merged;
-      }
-      return parsed;
+      const cleaned = parsed.filter(p => !oldIds.has(p.id));
+      const existingIds = new Set(cleaned.map(p => p.id));
+      const missing = initialProducts.filter(p => !oldIds.has(p.id) && !existingIds.has(p.id));
+      const finalProducts = missing.length > 0 ? [...cleaned, ...missing] : cleaned;
+      localStorage.setItem(`${STORAGE_KEY}_products`, JSON.stringify(finalProducts));
+      return finalProducts;
     } catch {
-      return initialProducts;
+      return initialProducts.filter(p => !oldIds.has(p.id));
     }
   });
 
@@ -575,28 +574,21 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
 
       // 4. Products smart sync
+      const oldProdIds = new Set(['prd_001', 'prd_002', 'prd_003', 'prd_004', 'prd_005']);
       const productsRow = (setRes.data || []).find((r: any) => r.id === 'inventory_products');
-      const cloudProducts = (productsRow?.data as Product[]) || [];
+      const rawCloudProducts = (productsRow?.data as Product[]) || [];
+      const cloudProducts = rawCloudProducts.filter(p => !oldProdIds.has(p.id));
+      const cleanLocalProducts = localProducts.filter(p => !oldProdIds.has(p.id));
       const cloudProdIds = new Set(cloudProducts.map(p => p.id));
-      const extraLocalProducts = localProducts.filter(p => !cloudProdIds.has(p.id));
+      const extraLocalProducts = cleanLocalProducts.filter(p => !cloudProdIds.has(p.id));
 
-      if (extraLocalProducts.length > 0) {
-        const mergedProd = [...cloudProducts, ...extraLocalProducts];
-        await client.from('accounting_settings').upsert({
-          id: 'inventory_products',
-          data: mergedProd,
-          updated_at: new Date().toISOString(),
-        });
-        setProducts(mergedProd);
-      } else if (cloudProducts.length > 0) {
-        setProducts(cloudProducts);
-      } else if (localProducts.length > 0) {
-        await client.from('accounting_settings').upsert({
-          id: 'inventory_products',
-          data: localProducts,
-          updated_at: new Date().toISOString(),
-        });
-      }
+      const mergedProd = [...cloudProducts, ...extraLocalProducts];
+      await client.from('accounting_settings').upsert({
+        id: 'inventory_products',
+        data: mergedProd,
+        updated_at: new Date().toISOString(),
+      });
+      setProducts(mergedProd);
 
       // 5. Journal smart sync
       const cloudJournal = (jrnRes.data || []).map(r => r.data as JournalEntry);

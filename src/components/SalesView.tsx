@@ -126,11 +126,12 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   ];
 
   const productPresets = [
-    'رول ورق كوشيه فاخر',
-    'كرتون ورق تصوير A4',
-    'أحبار طباعة ليزرية',
-    'دفاتر وسجلات فواتير جاهزة',
-    'علب كرتونية وتغليف جاهز'
+    'بودرة ألبسة DTF ناعمة',
+    'درع تكريمي فاخر ZX-02',
+    'درع كرستال شفاف SJ-40L',
+    'سارية علم فضي 3م',
+    'قماش أعلام مقام فاخر',
+    'قاعدة علم مكتب بورسلان'
   ];
 
   const customers = contacts.filter(c => c.type === 'customer' || c.type === 'both');

@@ -37,7 +37,7 @@ export const ProductsView: React.FC = () => {
   const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
 
   // Preset categories
-  const defaultCategories = ['أوراق وخامات', 'أحبار ومستهلكات', 'كرتون وتغليف', 'مطبوعات جاهزة', 'مواد دعائية', 'بضائع عامة'];
+  const defaultCategories = ['مواد طباعة وبودرة', 'أعلام وسواري', 'دروع تكريمية وكرستال', 'ستاندات وإعلانات', 'دفاتر ومطبوعات', 'بضائع عامة'];
   const allCategoryOptions = Array.from(new Set([...defaultCategories, ...categories]));
 
   // KPI Computations
