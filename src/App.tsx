@@ -8,11 +8,15 @@ import { InvoicesView } from './components/InvoicesView';
 import { ExpensesView } from './components/ExpensesView';
 import { ContactsView } from './components/ContactsView';
 import { ProductsView } from './components/ProductsView';
+import { AssetsView } from './components/AssetsView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
+import type { ProductionSource } from './types/accounting';
 
 const MainApp = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'sales' | 'products' | 'invoices' | 'expenses' | 'contacts' | 'journal' | 'accounts' | 'reports' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'sales' | 'products' | 'assets' | 'invoices' | 'expenses' | 'contacts' | 'journal' | 'accounts' | 'reports' | 'settings'>('dashboard');
+  const [salesInitialSource, setSalesInitialSource] = useState<ProductionSource | undefined>(undefined);
+  const [salesModalTrigger, setSalesModalTrigger] = useState(0);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -24,6 +28,7 @@ const MainApp = () => {
     { id: 'dashboard', label: 'لوحة التحكم', icon: '📊' },
     { id: 'sales', label: 'المبيعات والخدمات', icon: '🛒' },
     { id: 'products', label: 'البضائع والمنتجات', icon: '📦' },
+    { id: 'assets', label: 'الأصول والماكينات', icon: '🖨️' },
     { id: 'invoices', label: 'فواتير المبيعات', icon: '🧾', badge: unpaidCount > 0 ? unpaidCount : undefined, badgeColor: 'badge-orange' },
     { id: 'expenses', label: 'المصروفات والمشتريات', icon: '💳' },
     { id: 'contacts', label: 'العملاء والموردون', icon: '👥' },
@@ -163,9 +168,24 @@ const MainApp = () => {
           />
         )}
 
-        {activeTab === 'sales' && <SalesView />}
+        {activeTab === 'sales' && (
+          <SalesView 
+            initialSource={salesInitialSource}
+            modalTrigger={salesModalTrigger}
+          />
+        )}
 
         {activeTab === 'products' && <ProductsView />}
+
+        {activeTab === 'assets' && (
+          <AssetsView 
+            onNavigateToSalesWithSource={(source) => {
+              setSalesInitialSource(source);
+              setSalesModalTrigger(prev => prev + 1);
+              setActiveTab('sales');
+            }}
+          />
+        )}
 
         {activeTab === 'accounts' && <AccountsView />}
 

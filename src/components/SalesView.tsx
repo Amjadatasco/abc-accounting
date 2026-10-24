@@ -6,9 +6,11 @@ import { InvoicePrintModal } from './InvoicePrintModal';
 
 interface SalesViewProps {
   onOpenNewInvoiceModal?: () => void;
+  initialSource?: ProductionSource;
+  modalTrigger?: number;
 }
 
-export const SalesView: React.FC<SalesViewProps> = () => {
+export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigger }) => {
   const { invoices, contacts, products, addInvoice, markInvoicePaid, deleteInvoice, addContact } = useAccounting();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,7 +25,19 @@ export const SalesView: React.FC<SalesViewProps> = () => {
 
   // New Sale Form
   const [saleType, setSaleType] = useState<'service' | 'product'>('service');
-  const [productionSource, setProductionSource] = useState<ProductionSource>('uv');
+  const [productionSource, setProductionSource] = useState<ProductionSource>(initialSource || 'uv');
+
+  React.useEffect(() => {
+    if (initialSource) {
+      setProductionSource(initialSource);
+    }
+  }, [initialSource]);
+
+  React.useEffect(() => {
+    if (modalTrigger && modalTrigger > 0) {
+      setIsModalOpen(true);
+    }
+  }, [modalTrigger]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
   const [currency, setCurrency] = useState<Currency>('USD');
   const [customerName, setCustomerName] = useState('');
@@ -538,6 +552,17 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                   👕 DTF
                 </button>
                 <button 
+                  className={`btn btn-sm ${filterSource === 'press' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.55rem', 
+                    fontSize: '0.75rem',
+                    ...(filterSource === 'press' ? { backgroundColor: '#dc2626', borderColor: '#dc2626' } : {})
+                  }}
+                  onClick={() => setFilterSource('press')}
+                >
+                  ♨️ مكبس
+                </button>
+                <button 
                   className={`btn btn-sm ${filterSource === 'external' ? 'btn-primary' : 'btn-outline'}`}
                   style={{ 
                     padding: '0.25rem 0.55rem', 
@@ -547,6 +572,17 @@ export const SalesView: React.FC<SalesViewProps> = () => {
                   onClick={() => setFilterSource('external')}
                 >
                   🌐 خارجي
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterSource === 'general' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.55rem', 
+                    fontSize: '0.75rem',
+                    ...(filterSource === 'general' ? { backgroundColor: '#475569', borderColor: '#475569' } : {})
+                  }}
+                  onClick={() => setFilterSource('general')}
+                >
+                  📦 عامة
                 </button>
               </div>
             </div>

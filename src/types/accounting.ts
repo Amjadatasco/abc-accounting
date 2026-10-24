@@ -35,7 +35,7 @@ export interface JournalEntry {
   createdAt: string;
 }
 
-export type ProductionSource = 'uv' | 'dtf' | 'external' | 'general';
+export type ProductionSource = 'uv' | 'dtf' | 'press' | 'external' | 'general';
 
 export interface ProductionSourceInfo {
   id: ProductionSource;
@@ -49,8 +49,17 @@ export interface ProductionSourceInfo {
 
 export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
   {
+    id: 'dtf',
+    label: 'طابعة ألبسة DTF',
+    icon: '👕',
+    description: 'طباعة حرارية للملابس والأقمشة والتيشرتات والأعلام',
+    badgeBg: '#d1fae5',
+    badgeColor: '#047857',
+    badgeBorder: '#6ee7b7'
+  },
+  {
     id: 'uv',
-    label: 'ماكينة UV',
+    label: 'ماكينة UV مسطحة',
     icon: '🖨️',
     description: 'طباعة مسطحة / أسطح صلبة وأكريليك وخشب وهدايا',
     badgeBg: '#ede9fe',
@@ -58,13 +67,13 @@ export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
     badgeBorder: '#c4b5fd'
   },
   {
-    id: 'dtf',
-    label: 'ماكينة DTF',
-    icon: '👕',
-    description: 'طباعة حرارية للملابس والأقمشة والتيشرتات والأعلام',
-    badgeBg: '#d1fae5',
-    badgeColor: '#047857',
-    badgeBorder: '#6ee7b7'
+    id: 'press',
+    label: 'مكبس حراري 8*1',
+    icon: '♨️',
+    description: 'كبس حراري وتثبيت طباعة على التيشرتات والأكواب والدروع',
+    badgeBg: '#fef2f2',
+    badgeColor: '#dc2626',
+    badgeBorder: '#fecaca'
   },
   {
     id: 'external',
@@ -77,9 +86,9 @@ export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
   },
   {
     id: 'general',
-    label: 'بضاعة عامة / أخرى',
+    label: 'بضاعة عامة / بدون طباعة',
     icon: '📦',
-    description: 'مبيعات المخزن الجاهزة أو خدمات عامة متنوعة',
+    description: 'مبيعات المخزن المباشرة أو خدمات عامة متنوعة',
     badgeBg: '#f1f5f9',
     badgeColor: '#475569',
     badgeBorder: '#cbd5e1'
@@ -87,8 +96,27 @@ export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
 ];
 
 export const getProductionSourceDetails = (source?: ProductionSource): ProductionSourceInfo => {
-  return PRODUCTION_SOURCES.find(s => s.id === source) || PRODUCTION_SOURCES[3];
+  return PRODUCTION_SOURCES.find(s => s.id === source) || PRODUCTION_SOURCES[4];
 };
+
+export interface Asset {
+  id: string;
+  code: string;
+  name: string;
+  category: 'printers' | 'heat_press' | 'equipment' | 'other';
+  productionSourceKey?: ProductionSource; // 'dtf' | 'uv' | 'press' | 'general'
+  purchasePrice: number;
+  currency: Currency;
+  currencySymbol: string;
+  purchaseDate: string;
+  supplier: string;
+  invoiceRef?: string;
+  status: 'active' | 'maintenance' | 'standby';
+  description?: string;
+  serialNumber?: string;
+  notes?: string;
+  createdAt: string;
+}
 
 export interface InvoiceItem {
   id: string;
@@ -99,6 +127,7 @@ export interface InvoiceItem {
   taxRate: number; // percentage e.g. 15 or 0
   total: number;
   productionSource?: ProductionSource;
+  assetId?: string;
 }
 
 export interface Product {
@@ -133,6 +162,7 @@ export interface Invoice {
   currencySymbol?: string;
   saleType?: 'service' | 'product';
   productionSource?: ProductionSource;
+  assetId?: string;
   paymentMethod?: 'cash' | 'bank' | 'sham_cash' | 'credit';
   status: 'paid' | 'partial' | 'unpaid';
   paidAmount: number;
