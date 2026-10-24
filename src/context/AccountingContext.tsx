@@ -136,14 +136,19 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!saved) return initialExpenses;
     try {
       const parsed: ExpenseBill[] = JSON.parse(saved);
-      const existingIds = new Set(parsed.map(e => e.id));
+      const initialMap = new Map(initialExpenses.map(e => [e.id, e]));
+      const updated = parsed.map(exp => {
+        const init = initialMap.get(exp.id);
+        if (init && (exp.accountId === 'acc_5600' || exp.accountId === 'acc_5400' || !exp.accountId) && init.accountId !== exp.accountId) {
+          return { ...exp, accountId: init.accountId };
+        }
+        return exp;
+      });
+      const existingIds = new Set(updated.map(e => e.id));
       const missing = initialExpenses.filter(e => !existingIds.has(e.id));
-      if (missing.length > 0) {
-        const merged = [...parsed, ...missing];
-        localStorage.setItem(`${STORAGE_KEY}_expenses`, JSON.stringify(merged));
-        return merged;
-      }
-      return parsed;
+      const finalExpenses = missing.length > 0 ? [...updated, ...missing] : updated;
+      localStorage.setItem(`${STORAGE_KEY}_expenses`, JSON.stringify(finalExpenses));
+      return finalExpenses;
     } catch {
       return initialExpenses;
     }
@@ -502,28 +507,44 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
 
       // 2. Expenses smart sync
-      const cloudExpenses = (expRes.data || []).map(r => r.data as ExpenseBill);
+      const initialExpenseMap = new Map(initialExpenses.map(e => [e.id, e]));
+      let needsCloudUpdate = false;
+      const cloudExpenses = (expRes.data || []).map(r => {
+        const exp = r.data as ExpenseBill;
+        const init = initialExpenseMap.get(exp.id);
+        if (init && (exp.accountId === 'acc_5600' || exp.accountId === 'acc_5400' || !exp.accountId) && init.accountId !== exp.accountId) {
+          needsCloudUpdate = true;
+          return { ...exp, accountId: init.accountId };
+        }
+        return exp;
+      });
       const cloudExpIds = new Set(cloudExpenses.map(e => e.id));
       const extraLocalExpenses = localExpenses.filter(e => !cloudExpIds.has(e.id));
 
-      if (extraLocalExpenses.length > 0) {
-        await client.from('accounting_expenses').upsert(
-          extraLocalExpenses.map(exp => ({
-            id: exp.id,
-            bill_number: exp.billNumber,
-            vendor_id: exp.vendorId || null,
-            vendor_name: exp.vendorName,
-            date: exp.date,
-            category: exp.accountId,
-            currency: exp.currency || 'USD',
-            currency_symbol: exp.currencySymbol || '$',
-            total_amount: exp.amount,
-            paid_amount: exp.status === 'paid' ? exp.amount : 0,
-            status: exp.status,
-            data: exp,
-            updated_at: new Date().toISOString(),
-          }))
-        );
+      if (extraLocalExpenses.length > 0 || needsCloudUpdate) {
+        const toUpsert = [
+          ...extraLocalExpenses,
+          ...(needsCloudUpdate ? cloudExpenses.filter(e => initialExpenseMap.has(e.id)) : [])
+        ];
+        if (toUpsert.length > 0) {
+          await client.from('accounting_expenses').upsert(
+            toUpsert.map(exp => ({
+              id: exp.id,
+              bill_number: exp.billNumber,
+              vendor_id: exp.vendorId || null,
+              vendor_name: exp.vendorName,
+              date: exp.date,
+              category: exp.accountId,
+              currency: exp.currency || 'USD',
+              currency_symbol: exp.currencySymbol || '$',
+              total_amount: exp.amount,
+              paid_amount: exp.status === 'paid' ? exp.amount : 0,
+              status: exp.status,
+              data: exp,
+              updated_at: new Date().toISOString(),
+            }))
+          );
+        }
       }
       const finalExpenses = [...cloudExpenses, ...extraLocalExpenses];
       if (finalExpenses.length > 0 || cloudExpenses.length > 0) {

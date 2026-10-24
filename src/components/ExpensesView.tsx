@@ -13,6 +13,7 @@ export const ExpensesView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterAccountId, setFilterAccountId] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
 
   // Form
@@ -115,12 +116,14 @@ export const ExpensesView: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Base date and search filter (Search by billNumber, vendorName, notes, amount, or equivalent)
+  // Base date, account, and search filter (Search by billNumber, vendorName, notes, amount, or equivalent)
   const baseFilteredExpenses = expenses.filter(exp => {
     const term = searchTerm.trim().toLowerCase();
+    const matchesAccount = filterAccountId === 'all' || exp.accountId === filterAccountId;
+    const matchesDate = (!filterStartDate || exp.date >= filterStartDate) && (!filterEndDate || exp.date <= filterEndDate);
+
     if (!term) {
-      const matchesDate = (!filterStartDate || exp.date >= filterStartDate) && (!filterEndDate || exp.date <= filterEndDate);
-      return matchesDate;
+      return matchesDate && matchesAccount;
     }
 
     const matchesText = exp.billNumber.toLowerCase().includes(term) ||
@@ -132,8 +135,7 @@ export const ExpensesView: React.FC = () => {
       (exp.equivalentAmount && String(Math.round(exp.equivalentAmount)).includes(term));
 
     const matchesSearch = matchesText || matchesAmount;
-    const matchesDate = (!filterStartDate || exp.date >= filterStartDate) && (!filterEndDate || exp.date <= filterEndDate);
-    return matchesSearch && matchesDate;
+    return matchesSearch && matchesDate && matchesAccount;
   });
 
   // Per-payer groupings
@@ -200,6 +202,38 @@ export const ExpensesView: React.FC = () => {
       return getUnifiedUSD(a) - getUnifiedUSD(b);
     }
     return 0;
+  });
+
+  // Category Breakdown configuration and active accounts
+  const categoryConfig: { [key: string]: { icon: string; shortName: string; color: string; border: string; bg: string } } = {
+    'acc_5430': { icon: '🏗️', shortName: 'ديكور وتجهيزات الورشة', color: '#0284c7', border: '#bae6fd', bg: '#f0f9ff' },
+    'acc_5410': { icon: '⚡', shortName: 'كهرباء وتمديدات طاقة', color: '#d97706', border: '#fde68a', bg: '#fffbeb' },
+    'acc_5700': { icon: '🚚', shortName: 'شحن ونقل وتنزيل ماكينات', color: '#059669', border: '#a7f3d0', bg: '#f0fdf4' },
+    'acc_1210': { icon: '🖨️', shortName: 'آلات وماكينات (أصول)', color: '#7c3aed', border: '#ddd6fe', bg: '#faf5ff' },
+    'acc_1230': { icon: '💻', shortName: 'أجهزة كمبيوتر وتقنية', color: '#4f46e5', border: '#c7d2fe', bg: '#eef2ff' },
+    'acc_5110': { icon: '🎨', shortName: 'أحبار ومواد طباعة', color: '#dc2626', border: '#fecaca', bg: '#fef2f2' },
+    'acc_5600': { icon: '☕', shortName: 'ضيافة ونظافة ونثريات', color: '#475569', border: '#cbd5e1', bg: '#f8fafc' },
+  };
+
+  const usedAccountIds = Array.from(new Set(rawList.map(e => e.accountId).filter(Boolean)));
+  const categorySummaries = usedAccountIds.map(accId => {
+    const acc = accounts.find(a => a.id === accId);
+    const count = rawList.filter(e => e.accountId === accId).length;
+    const cfg = categoryConfig[accId] || { icon: '📁', shortName: acc?.name || 'مصروف', color: '#64748b', border: '#e2e8f0', bg: '#ffffff' };
+    const usdSub = rawList.filter(e => e.accountId === accId && (e.currency || 'USD') === 'USD').reduce((s, e) => s + e.amount, 0);
+    const sypSub = rawList.filter(e => e.accountId === accId && (e.currency || 'USD') === 'SYP').reduce((s, e) => s + e.amount, 0);
+    return {
+      id: accId,
+      name: acc?.name || cfg.shortName,
+      shortName: cfg.shortName,
+      icon: cfg.icon,
+      color: cfg.color,
+      border: cfg.border,
+      bg: cfg.bg,
+      count,
+      usdSub,
+      sypSub
+    };
   });
 
   const getPayerBadge = (payer?: ExpensePayer) => {
@@ -767,6 +801,25 @@ export const ExpensesView: React.FC = () => {
 
           {/* Sorting & Search Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', flex: '1', justifyContent: 'flex-end', minWidth: '280px' }}>
+            
+            {/* Account / Category Filter */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>بند المصروف:</span>
+              <select 
+                className="form-select"
+                style={{ width: 'auto', minWidth: '180px', padding: '0.35rem 0.65rem', fontSize: '0.82rem', fontWeight: 600 }}
+                value={filterAccountId}
+                onChange={(e) => setFilterAccountId(e.target.value)}
+              >
+                <option value="all">📁 جميع البنود والتصنيفات</option>
+                {categorySummaries.map(cat => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon} {cat.name} ({cat.count})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Sort Dropdown */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>الترتيب:</span>
@@ -816,6 +869,53 @@ export const ExpensesView: React.FC = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Interactive Category Filter Pills */}
+        <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--text-dark)' }}>📂 تصفية سريعة بالبند:</span>
+          <button 
+            type="button"
+            className={`btn btn-sm ${filterAccountId === 'all' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '15px' }}
+            onClick={() => setFilterAccountId('all')}
+          >
+            الكل ({rawList.length})
+          </button>
+          {categorySummaries.map(cat => {
+            const isSelected = filterAccountId === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  padding: '0.2rem 0.65rem',
+                  fontSize: '0.75rem',
+                  borderRadius: '15px',
+                  fontWeight: 700,
+                  backgroundColor: isSelected ? cat.color : cat.bg,
+                  color: isSelected ? '#ffffff' : cat.color,
+                  border: `1.5px solid ${isSelected ? cat.color : cat.border}`,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onClick={() => setFilterAccountId(isSelected ? 'all' : cat.id)}
+              >
+                {cat.icon} {cat.shortName} ({cat.count})
+              </button>
+            );
+          })}
+          {filterAccountId !== 'all' && (
+            <button
+              type="button"
+              className="btn btn-sm btn-outline"
+              style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '15px', color: 'var(--text-muted)' }}
+              onClick={() => setFilterAccountId('all')}
+            >
+              ✕ إلغاء الفرز
+            </button>
+          )}
         </div>
       </div>
 

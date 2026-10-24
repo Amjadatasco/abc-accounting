@@ -563,11 +563,33 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                   ♨️ مكبس
                 </button>
                 <button 
+                  className={`btn btn-sm ${filterSource === 'laser' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.55rem', 
+                    fontSize: '0.75rem',
+                    ...(filterSource === 'laser' ? { backgroundColor: '#b45309', borderColor: '#b45309' } : {})
+                  }}
+                  onClick={() => setFilterSource('laser')}
+                >
+                  ⚡ ليزر
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterSource === 'regular_print' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.55rem', 
+                    fontSize: '0.75rem',
+                    ...(filterSource === 'regular_print' ? { backgroundColor: '#0369a1', borderColor: '#0369a1' } : {})
+                  }}
+                  onClick={() => setFilterSource('regular_print')}
+                >
+                  📄 عادية
+                </button>
+                <button 
                   className={`btn btn-sm ${filterSource === 'external' ? 'btn-primary' : 'btn-outline'}`}
                   style={{ 
                     padding: '0.25rem 0.55rem', 
                     fontSize: '0.75rem',
-                    ...(filterSource === 'external' ? { backgroundColor: '#d97706', borderColor: '#d97706' } : {})
+                    ...(filterSource === 'external' ? { backgroundColor: '#c2410c', borderColor: '#c2410c' } : {})
                   }}
                   onClick={() => setFilterSource('external')}
                 >

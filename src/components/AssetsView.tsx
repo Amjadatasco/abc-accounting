@@ -12,12 +12,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState<'all' | 'printers' | 'heat_press' | 'equipment' | 'other'>('all');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'printers' | 'heat_press' | 'laser' | 'equipment' | 'other'>('all');
 
   // Form State
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [category, setCategory] = useState<'printers' | 'heat_press' | 'equipment' | 'other'>('printers');
+  const [category, setCategory] = useState<'printers' | 'heat_press' | 'laser' | 'equipment' | 'other'>('printers');
   const [productionSourceKey, setProductionSourceKey] = useState<ProductionSource>('dtf');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [currency, setCurrency] = useState<Currency>('USD');
@@ -261,12 +261,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
             const perf = getAssetPerformance(ast);
             const isDtf = ast.productionSourceKey === 'dtf';
             const isUv = ast.productionSourceKey === 'uv';
+            const isLaser = ast.productionSourceKey === 'laser' || ast.category === 'laser';
             const isPress = ast.productionSourceKey === 'press';
+            const isRegularPrint = ast.productionSourceKey === 'regular_print';
 
-            const cardBorder = isDtf ? '#a7f3d0' : isUv ? '#ddd6fe' : isPress ? '#fecaca' : '#e2e8f0';
-            const cardBg = isDtf ? '#f0fdf4' : isUv ? '#faf5ff' : isPress ? '#fef2f2' : '#ffffff';
-            const titleColor = isDtf ? '#047857' : isUv ? '#6d28d9' : isPress ? '#b91c1c' : '#334155';
-            const icon = isDtf ? '👕' : isUv ? '🖨️' : isPress ? '♨️' : '⚙️';
+            const cardBorder = isDtf ? '#a7f3d0' : isUv ? '#ddd6fe' : isLaser ? '#fde68a' : isPress ? '#fecaca' : isRegularPrint ? '#bae6fd' : '#e2e8f0';
+            const cardBg = isDtf ? '#f0fdf4' : isUv ? '#faf5ff' : isLaser ? '#fffbeb' : isPress ? '#fef2f2' : isRegularPrint ? '#f0f9ff' : '#ffffff';
+            const titleColor = isDtf ? '#047857' : isUv ? '#6d28d9' : isLaser ? '#b45309' : isPress ? '#b91c1c' : isRegularPrint ? '#0369a1' : '#334155';
+            const icon = isDtf ? '👕' : isUv ? '🖨️' : isLaser ? '⚡' : isPress ? '♨️' : isRegularPrint ? '📄' : '⚙️';
 
             return (
               <div 
@@ -425,6 +427,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
                 onClick={() => setFilterCategory('heat_press')}
               >
                 ♨️ مكابس حرارية
+              </button>
+              <button 
+                className={`btn btn-sm ${filterCategory === 'laser' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
+                onClick={() => setFilterCategory('laser')}
+              >
+                ⚡ ماكينات ليزر
               </button>
               <button 
                 className={`btn btn-sm ${filterCategory === 'equipment' ? 'btn-primary' : 'btn-outline'}`}
@@ -603,7 +612,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
                       value={category} 
                       onChange={(e) => setCategory(e.target.value as any)}
                     >
-                      <option value="printers">🖨️ طابعات رقمية (DTF / UV / ليزرية)</option>
+                      <option value="printers">🖨️ طابعات رقمية ومكتبية (DTF / UV / عادية)</option>
+                      <option value="laser">⚡ ماكينات ليزر وقص ونقش</option>
                       <option value="heat_press">♨️ مكابس حرارية وتثبيت</option>
                       <option value="equipment">⚙️ أجهزة ومعدات ورشة مساندة</option>
                       <option value="other">📦 أصول ومعدات أخرى</option>
@@ -619,7 +629,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
                     >
                       <option value="dtf">👕 ماكينة الـ DTF (طباعة ألبسة وأقمشة)</option>
                       <option value="uv">🖨️ ماكينة الـ UV (طباعة مسطحة وأسطح صلبة)</option>
+                      <option value="laser">⚡ ماكينة ليزر صغيرة (قص ونقش وحفر)</option>
                       <option value="press">♨️ مكبس حراري 8*1</option>
+                      <option value="regular_print">📄 طابعة عادية (طباعة ورق ومستندات)</option>
                       <option value="general">📦 عام / بدون طباعة</option>
                     </select>
                   </div>

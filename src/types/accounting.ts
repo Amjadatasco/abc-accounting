@@ -35,7 +35,7 @@ export interface JournalEntry {
   createdAt: string;
 }
 
-export type ProductionSource = 'uv' | 'dtf' | 'press' | 'external' | 'general';
+export type ProductionSource = 'uv' | 'dtf' | 'laser' | 'press' | 'regular_print' | 'external' | 'general';
 
 export interface ProductionSourceInfo {
   id: ProductionSource;
@@ -67,6 +67,15 @@ export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
     badgeBorder: '#c4b5fd'
   },
   {
+    id: 'laser',
+    label: 'ماكينة ليزر صغيرة',
+    icon: '⚡',
+    description: 'قص ونقش وحفر ليزري على الخشب والأكريليك والجلود والدروع',
+    badgeBg: '#fef3c7',
+    badgeColor: '#b45309',
+    badgeBorder: '#fde68a'
+  },
+  {
     id: 'press',
     label: 'مكبس حراري 8*1',
     icon: '♨️',
@@ -76,13 +85,22 @@ export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
     badgeBorder: '#fecaca'
   },
   {
+    id: 'regular_print',
+    label: 'طابعة عادية (ورق ومستندات)',
+    icon: '📄',
+    description: 'طباعة ورقية ومستندات وفواتير وتصوير وملفات',
+    badgeBg: '#e0f2fe',
+    badgeColor: '#0369a1',
+    badgeBorder: '#bae6fd'
+  },
+  {
     id: 'external',
     label: 'مصدر خارجي',
     icon: '🌐',
     description: 'تنفيذ لدى ورش ومطابع خارجية أو موردين معتمدين',
-    badgeBg: '#fef3c7',
-    badgeColor: '#b45309',
-    badgeBorder: '#fcd34d'
+    badgeBg: '#fff7ed',
+    badgeColor: '#c2410c',
+    badgeBorder: '#fed7aa'
   },
   {
     id: 'general',
@@ -96,14 +114,14 @@ export const PRODUCTION_SOURCES: ProductionSourceInfo[] = [
 ];
 
 export const getProductionSourceDetails = (source?: ProductionSource): ProductionSourceInfo => {
-  return PRODUCTION_SOURCES.find(s => s.id === source) || PRODUCTION_SOURCES[4];
+  return PRODUCTION_SOURCES.find(s => s.id === source) || PRODUCTION_SOURCES[6];
 };
 
 export interface Asset {
   id: string;
   code: string;
   name: string;
-  category: 'printers' | 'heat_press' | 'equipment' | 'other';
+  category: 'printers' | 'heat_press' | 'laser' | 'equipment' | 'other';
   productionSourceKey?: ProductionSource; // 'dtf' | 'uv' | 'press' | 'general'
   purchasePrice: number;
   currency: Currency;
