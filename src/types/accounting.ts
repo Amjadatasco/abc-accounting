@@ -178,13 +178,17 @@ export interface Invoice {
   totalAmount: number;
   currency?: Currency;
   currencySymbol?: string;
-  saleType?: 'service' | 'product';
+  saleType?: 'service' | 'product' | 'external';
   productionSource?: ProductionSource;
   assetId?: string;
   paymentMethod?: 'cash' | 'bank' | 'sham_cash' | 'credit';
   status: 'paid' | 'partial' | 'unpaid';
   paidAmount: number;
   notes?: string;
+  externalSupplierName?: string;
+  externalCost?: number;
+  externalPaymentMethod?: 'cash' | 'bank' | 'sham_cash' | 'credit';
+  externalStatus?: 'paid' | 'unpaid';
   createdAt: string;
 }
 

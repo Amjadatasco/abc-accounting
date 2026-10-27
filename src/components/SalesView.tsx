@@ -11,12 +11,12 @@ interface SalesViewProps {
 }
 
 export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigger }) => {
-  const { invoices, contacts, products, addInvoice, markInvoicePaid, deleteInvoice, addContact } = useAccounting();
+  const { invoices, contacts, products, addInvoice, markInvoicePaid, deleteInvoice, addContact, addExpense, accounts } = useAccounting();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCurrency, setFilterCurrency] = useState<'all' | 'USD' | 'SYP'>('all');
-  const [filterType, setFilterType] = useState<'all' | 'service' | 'product'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'service' | 'product' | 'external'>('all');
   const [filterSource, setFilterSource] = useState<'all' | ProductionSource>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -24,12 +24,19 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
 
   // New Sale Form
-  const [saleType, setSaleType] = useState<'service' | 'product'>('service');
+  const [saleType, setSaleType] = useState<'service' | 'product' | 'external'>(initialSource === 'external' ? 'external' : 'service');
   const [productionSource, setProductionSource] = useState<ProductionSource>(initialSource || 'uv');
+  const [externalSupplier, setExternalSupplier] = useState('');
+  const [externalCost, setExternalCost] = useState('');
+  const [externalPaymentMethod, setExternalPaymentMethod] = useState<'cash' | 'bank' | 'sham_cash' | 'credit'>('cash');
+  const [autoRecordExpense, setAutoRecordExpense] = useState(true);
 
   React.useEffect(() => {
     if (initialSource) {
       setProductionSource(initialSource);
+      if (initialSource === 'external') {
+        setSaleType('external');
+      }
     }
   }, [initialSource]);
 
@@ -134,7 +141,19 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     'قاعدة علم مكتب بورسلان'
   ];
 
+  const externalPresets = [
+    'طباعة فلكس وبنر خارجي مع حلقات وتثبيت',
+    'طباعة أوفست مجلات وبروشورات كميات',
+    'كروت شخصية فاخرة وسلفان سبوت UV',
+    'أكياس كرتون وبوكسات هدايا وتغليف مطبوع',
+    'تصنيع حروف نافرة مضيئة زنكور وأكريليك',
+    'لوحات إعلانية طرقية فلكس بوكس مع إضاءة',
+    'أعلام قماش كبيرة مع ساريات وقواعد رخام',
+    'طباعة أوفست فواتير وسندات مكربنة'
+  ];
+
   const customers = contacts.filter(c => c.type === 'customer' || c.type === 'both');
+  const vendors = contacts.filter(c => c.type === 'vendor' || c.type === 'both');
 
   const handleSubmit = (e: React.FormEvent, printImmediately = false) => {
     e.preventDefault();
@@ -143,6 +162,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     const qtyNum = parseFloat(quantity) || 1;
     let priceNum = parseFloat(unitPrice) || 0;
     let totalNum = parseFloat(totalAmountInput) || 0;
+    const extCostNum = parseFloat(externalCost) || 0;
+    const isExternal = saleType === 'external' || productionSource === 'external';
 
     if (totalNum <= 0 && priceNum > 0) {
       totalNum = qtyNum * priceNum;
@@ -160,6 +181,11 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     }
     if (totalNum <= 0) {
       alert('يرجى إدخال السعر الفردي أو المبلغ الإجمالي بشكل صحيح أكبر من الصفر');
+      return;
+    }
+
+    if (isExternal && !externalSupplier.trim()) {
+      alert('يرجى تحديد أو كتابة اسم الورشة أو المطبعة الخارجية المنفذة');
       return;
     }
 
@@ -223,7 +249,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
           unitPrice: priceNum,
           taxRate: 0,
           total: totalAmount,
-          productionSource
+          productionSource: isExternal ? 'external' : productionSource
         }
       ],
       subtotal: totalAmount,
@@ -232,14 +258,56 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       currency,
       currencySymbol: currSym,
       saleType,
-      productionSource,
+      productionSource: isExternal ? 'external' : productionSource,
       paymentMethod,
       status: finalStatus,
       paidAmount,
-      notes: notes || (saleType === 'service' ? `تقديم خدمة: ${itemTrimmed}` : `بيع منتج: ${itemTrimmed}`)
+      notes: notes || (isExternal ? `تنفيذ خارجي (${externalSupplier.trim()}): ${itemTrimmed}` : saleType === 'service' ? `تقديم خدمة: ${itemTrimmed}` : `بيع منتج: ${itemTrimmed}`),
+      externalSupplierName: isExternal ? externalSupplier.trim() : undefined,
+      externalCost: isExternal && extCostNum > 0 ? extCostNum : undefined,
+      externalPaymentMethod: isExternal ? externalPaymentMethod : undefined,
+      externalStatus: isExternal ? (externalPaymentMethod === 'credit' ? 'unpaid' : 'paid') : undefined
     };
 
     addInvoice(newSaleData);
+
+    // Auto-record expense bill for the external workshop if enabled
+    if (isExternal && autoRecordExpense && extCostNum > 0 && externalSupplier.trim()) {
+      const extVendTrimmed = externalSupplier.trim();
+      let vendorContact = contacts.find(c => c.name.trim().toLowerCase() === extVendTrimmed.toLowerCase());
+      if (!vendorContact) {
+        addContact({
+          name: extVendTrimmed,
+          type: 'vendor',
+          phone: 'غير مسجل',
+          balance: 0,
+          currency,
+          currencySymbol: currSym
+        });
+      }
+
+      const outsourceAcc = accounts.find(a => a.id === 'acc_5150' || a.name.includes('خارجية')) || accounts.find(a => a.category === 'expense');
+      const accId = outsourceAcc ? outsourceAcc.id : 'acc_5150';
+      const billNumber = `EXP-OUT-${Date.now().toString().slice(-6)}`;
+
+      addExpense({
+        billNumber,
+        vendorId: vendorContact?.id,
+        vendorName: extVendTrimmed,
+        accountId: accId,
+        date: saleDate,
+        amount: extCostNum,
+        taxAmount: 0,
+        currency,
+        currencySymbol: currSym,
+        exchangeRate: 14800,
+        equivalentAmount: currency === 'USD' ? extCostNum * 14800 : extCostNum / 14800,
+        paymentMethod: externalPaymentMethod,
+        paidBy: 'abc',
+        status: externalPaymentMethod === 'credit' ? 'unpaid' : 'paid',
+        notes: `تكلفة تنفيذ خارجي للفاتورة ${invoiceNumber} (${itemTrimmed}) لدى ${extVendTrimmed}`
+      });
+    }
 
     if (printImmediately) {
       setPrintingInvoice({
@@ -259,6 +327,10 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     setTotalAmountInput('');
     setPartialAmount('');
     setNotes('');
+    setExternalSupplier('');
+    setExternalCost('');
+    setExternalPaymentMethod('cash');
+    setAutoRecordExpense(true);
     setIsModalOpen(false);
   };
 
@@ -270,7 +342,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                           (inv.notes && inv.notes.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesCurrency = filterCurrency === 'all' || (inv.currency || 'USD') === filterCurrency;
-    const matchesType = filterType === 'all' || (inv.saleType || 'service') === filterType;
+    const matchesType = filterType === 'all' || 
+      (filterType === 'external' ? (inv.saleType === 'external' || inv.productionSource === 'external') : (inv.saleType || 'service') === filterType);
     const matchesSource = filterSource === 'all' || (inv.productionSource || 'general') === filterSource;
     const matchesStatus = filterStatus === 'all' || 
                           (filterStatus === 'paid' && inv.status === 'paid') ||
@@ -315,6 +388,26 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
           <p>تسجيل مبيعات الخدمات والمنتجات اليومية بسهولة وسرعة مع إدارة التحصيل الفوري والآجل</p>
         </div>
         <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn" 
+            onClick={() => { 
+              setSaleType('external'); 
+              setSelectedProductId(''); 
+              setProductionSource('external'); 
+              setIsModalOpen(true); 
+            }}
+            style={{ 
+              padding: '0.65rem 1.15rem', 
+              fontSize: '0.9rem', 
+              fontWeight: 800, 
+              backgroundColor: '#ea580c', 
+              color: '#ffffff', 
+              borderColor: '#ea580c',
+              boxShadow: '0 2px 4px rgba(234,88,12,0.2)'
+            }}
+          >
+            <span>🌐</span> تسجيل تنفيذ خارجي
+          </button>
           <button 
             className="btn btn-primary" 
             onClick={() => { setSaleType('product'); setSelectedProductId(''); setProductionSource('general'); setIsModalOpen(true); }}
@@ -508,6 +601,17 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                   onClick={() => setFilterType('service')}
                 >
                   🛠️ خدمات
+                </button>
+                <button 
+                  className={`btn btn-sm ${filterType === 'external' ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ 
+                    padding: '0.25rem 0.6rem', 
+                    fontSize: '0.75rem',
+                    ...(filterType === 'external' ? { backgroundColor: '#ea580c', borderColor: '#ea580c' } : {})
+                  }}
+                  onClick={() => setFilterType('external')}
+                >
+                  🌐 تنفيذ خارجي
                 </button>
                 <button 
                   className={`btn btn-sm ${filterType === 'product' ? 'btn-primary' : 'btn-outline'}`}
@@ -750,13 +854,25 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                         </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <span className={`badge ${sale.saleType === 'product' ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '0.75rem' }}>
-                          {sale.saleType === 'product' ? '📦 منتج' : '🛠️ خدمة'}
-                        </span>
+                        {sale.saleType === 'external' || sale.productionSource === 'external' ? (
+                          <span className="badge" style={{ backgroundColor: '#fff7ed', color: '#c2410c', border: '1px solid #fed7aa', fontSize: '0.75rem', fontWeight: 800 }}>
+                            🌐 خارجي
+                          </span>
+                        ) : (
+                          <span className={`badge ${sale.saleType === 'product' ? 'badge-blue' : 'badge-green'}`} style={{ fontSize: '0.75rem' }}>
+                            {sale.saleType === 'product' ? '📦 منتج' : '🛠️ خدمة'}
+                          </span>
+                        )}
                       </td>
                       <td style={{ fontWeight: 600 }}>
                         {firstItem}
                         {sale.items.length > 1 && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginRight: '0.3rem' }}>+{sale.items.length - 1} بنود</span>}
+                        {sale.externalSupplierName && (
+                          <div style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <span>🏭 ورشة: <strong>{sale.externalSupplierName}</strong></span>
+                            {sale.externalCost ? <span style={{ color: '#9a3412', fontWeight: 700 }}>(تكلفة: {saleSym} {sale.externalCost.toLocaleString()})</span> : null}
+                          </div>
+                        )}
                       </td>
                       <td style={{ fontWeight: 600 }}>{sale.customerName}</td>
                       <td>
@@ -772,7 +888,12 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                         </span>
                       </td>
                       <td style={{ textAlign: 'left', fontWeight: 800 }}>
-                        {saleSym} {sale.totalAmount.toLocaleString()}
+                        <div>{saleSym} {sale.totalAmount.toLocaleString()}</div>
+                        {sale.externalCost && sale.externalCost > 0 ? (
+                          <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 800, marginTop: '0.15rem' }}>
+                            ربح: {saleSym} {(sale.totalAmount - sale.externalCost).toLocaleString()}
+                          </div>
+                        ) : null}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={`badge ${sale.status === 'paid' ? 'badge-green' : sale.status === 'partial' ? 'badge-orange' : 'badge-red'}`}>
@@ -833,7 +954,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1.4rem' }}>🛒</span>
                 <div>
-                  <h3 style={{ margin: 0 }}>تسجيل عملية بيع جديدة (خدمة أو منتج)</h3>
+                  <h3 style={{ margin: 0 }}>تسجيل عملية بيع جديدة (خدمة، تنفيذ خارجي، أو منتج)</h3>
                   <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>إدخال سريع وسلس مع الحفظ الفوري للعميل والحسابات</p>
                 </div>
               </div>
@@ -875,23 +996,52 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
 
                 {/* 2. Sale Type Toggle */}
                 <div style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label" style={{ fontWeight: 800 }}>نوع البيع:</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                  <label className="form-label" style={{ fontWeight: 800 }}>نوع البيع والتنفيذ:</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.65rem' }}>
                     <button
                       type="button"
                       className={`btn ${saleType === 'service' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ padding: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                      onClick={() => { setSaleType('service'); if (productionSource === 'general') setProductionSource('uv'); }}
+                      style={{ padding: '0.6rem 0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                      onClick={() => { 
+                        setSaleType('service'); 
+                        if (productionSource === 'general' || productionSource === 'external') setProductionSource('uv'); 
+                      }}
                     >
-                      <span>🛠️</span> تقديم خدمة (طباعة / تصميم / تنفيذ)
+                      <span>🛠️</span> تقديم خدمة داخلية (UV / DTF...)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ 
+                        padding: '0.6rem 0.75rem', 
+                        fontWeight: 800, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.4rem', 
+                        fontSize: '0.85rem',
+                        backgroundColor: saleType === 'external' ? '#ea580c' : '#ffffff',
+                        color: saleType === 'external' ? '#ffffff' : '#ea580c',
+                        border: '2px solid #ea580c',
+                        boxShadow: saleType === 'external' ? '0 2px 6px rgba(234,88,12,0.25)' : 'none'
+                      }}
+                      onClick={() => { 
+                        setSaleType('external'); 
+                        setProductionSource('external'); 
+                      }}
+                    >
+                      <span>🌐</span> تنفيذ خارجي (أوت سورس / ورش ومطابع)
                     </button>
                     <button
                       type="button"
                       className={`btn ${saleType === 'product' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ padding: '0.6rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                      onClick={() => setSaleType('product')}
+                      style={{ padding: '0.6rem 0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+                      onClick={() => { 
+                        setSaleType('product'); 
+                        if (productionSource === 'external') setProductionSource('general'); 
+                      }}
                     >
-                      <span>📦</span> بيع منتج جاهز (ورق / أحبار / رول / كروت)
+                      <span>📦</span> بيع منتج جاهز (مخزن / بضاعة)
                     </button>
                   </div>
                 </div>
@@ -911,7 +1061,14 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                         <button
                           key={src.id}
                           type="button"
-                          onClick={() => setProductionSource(src.id)}
+                          onClick={() => {
+                            setProductionSource(src.id);
+                            if (src.id === 'external') {
+                              setSaleType('external');
+                            } else if (saleType === 'external') {
+                              setSaleType('service');
+                            }
+                          }}
                           style={{
                             padding: '0.7rem 0.85rem',
                             borderRadius: '8px',
@@ -1021,13 +1178,13 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
 
                 <div className="form-group">
                   <label className="form-label">
-                    {saleType === 'service' ? 'بيان الخدمة المقدمة للعميل *' : 'بيان الصنف أو المنتج المباع *'}
+                    {saleType === 'external' ? 'بيان العمل المطلوب تنفيذه خارجياً *' : saleType === 'service' ? 'بيان الخدمة المقدمة للعميل *' : 'بيان الصنف أو المنتج المباع *'}
                   </label>
                   <input 
                     type="text" 
                     className="form-input" 
                     required 
-                    placeholder={saleType === 'service' ? 'مثال: طباعة 1000 بروشور مطوي وجهين، تصميم شعار...' : 'مثال: 5 كراتين ورق تصوير A4، رول بنر 80 جرام...'}
+                    placeholder={saleType === 'external' ? 'مثال: طباعة لوحة فلكس 4*3م مع شاسيه، طباعة 5000 بروشور أوفست...' : saleType === 'service' ? 'مثال: طباعة 1000 بروشور مطوي وجهين، تصميم شعار...' : 'مثال: 5 كراتين ورق تصوير A4، رول بنر 80 جرام...'}
                     value={itemDescription} 
                     onChange={(e) => setItemDescription(e.target.value)} 
                   />
@@ -1035,7 +1192,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                   {/* Fast 1-Click Preset Buttons */}
                   <div style={{ marginTop: '0.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>اختيارات سريعة:</span>
-                    {(saleType === 'service' ? servicePresets : productPresets).map((preset, idx) => (
+                    {(saleType === 'external' ? externalPresets : saleType === 'service' ? servicePresets : productPresets).map((preset, idx) => (
                       <button
                         key={idx}
                         type="button"
@@ -1052,6 +1209,133 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                     ))}
                   </div>
                 </div>
+
+                {/* 4.5 External Outsourcing Execution Card */}
+                {(saleType === 'external' || productionSource === 'external') && (
+                  <div style={{
+                    padding: '1.1rem',
+                    backgroundColor: '#fff7ed',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1.5px solid #fed7aa',
+                    marginBottom: '1.25rem',
+                    boxShadow: '0 2px 6px rgba(194,65,12,0.06)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#c2410c', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <span>🌐</span> بيانات وتكاليف التنفيذ الخارجي (Outsource)
+                      </span>
+                      <span className="badge" style={{ backgroundColor: '#ffedd5', color: '#9a3412', fontWeight: 700, fontSize: '0.75rem', border: '1px solid #fdba74' }}>
+                        💡 حساب صافي ربح الوساطة تلقائياً
+                      </span>
+                    </div>
+
+                    <div className="form-row">
+                      {/* External Supplier / Workshop */}
+                      <div className="form-group" style={{ flex: 1.5 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: '#9a3412' }}>
+                          اسم الورشة / المطبعة الخارجية *
+                        </label>
+                        <input 
+                          type="text"
+                          list="external-vendors-datalist"
+                          className="form-input"
+                          required={saleType === 'external'}
+                          placeholder="اكتب أو اختر اسم الورشة / المطبعة..."
+                          value={externalSupplier}
+                          onChange={(e) => setExternalSupplier(e.target.value)}
+                          style={{ borderColor: '#fdba74', backgroundColor: '#ffffff' }}
+                        />
+                        <datalist id="external-vendors-datalist">
+                          {vendors.map(v => (
+                            <option key={v.id} value={v.name} />
+                          ))}
+                        </datalist>
+                        <span style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.25rem', display: 'block' }}>
+                          الورشة أو المطبعة المنفذة (تُحفظ في دليل الموردين)
+                        </span>
+                      </div>
+
+                      {/* External Workshop Cost */}
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: '#9a3412' }}>
+                          تكلفة الورشة الخارجية ({currSym}) *
+                        </label>
+                        <input 
+                          type="number"
+                          step="any"
+                          min="0"
+                          className="form-input"
+                          placeholder="0.00"
+                          value={externalCost}
+                          onChange={(e) => setExternalCost(e.target.value)}
+                          style={{ borderColor: '#fdba74', fontWeight: 800, fontSize: '1rem', backgroundColor: '#ffffff' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.25rem', display: 'block' }}>
+                          كم حساب الورشة الصافي عليك؟
+                        </span>
+                      </div>
+
+                      {/* Workshop Payment Method */}
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label" style={{ fontWeight: 700, color: '#9a3412' }}>
+                          طريقة دفع الورشة
+                        </label>
+                        <select
+                          className="form-select"
+                          value={externalPaymentMethod}
+                          onChange={(e) => setExternalPaymentMethod(e.target.value as any)}
+                          style={{ borderColor: '#fdba74', backgroundColor: '#ffffff' }}
+                        >
+                          <option value="cash">💵 نقداً كاش</option>
+                          <option value="sham_cash">📱 محفظة شام كاش</option>
+                          <option value="bank">🏦 تحويل بنكي</option>
+                          <option value="credit">⏳ ذمة / آجل للورشة</option>
+                        </select>
+                        <span style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.25rem', display: 'block' }}>
+                          حالة السداد للمطبعة الخارجية
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Live Brokerage Margin Banner */}
+                    <div style={{
+                      marginTop: '0.75rem',
+                      padding: '0.75rem 1rem',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '8px',
+                      border: '1.5px solid #fed7aa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem'
+                    }}>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          سعر البيع للزبون: <strong>{currSym} {(parseFloat(totalAmountInput) || 0).toLocaleString()}</strong> | تكلفة الورشة: <strong>{currSym} {(parseFloat(externalCost) || 0).toLocaleString()}</strong>
+                        </div>
+                        <div style={{ fontSize: '1rem', fontWeight: 900, color: ((parseFloat(totalAmountInput) || 0) - (parseFloat(externalCost) || 0)) >= 0 ? '#15803d' : '#dc2626', marginTop: '0.15rem' }}>
+                          صافي ربح الوساطة والتنفيذ: {currSym} {((parseFloat(totalAmountInput) || 0) - (parseFloat(externalCost) || 0)).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          {parseFloat(totalAmountInput) > 0 && (
+                            <span style={{ fontSize: '0.8rem', fontWeight: 700, marginRight: '0.5rem', color: '#4b5563' }}>
+                              (نسبة الربح: {Math.round((((parseFloat(totalAmountInput) || 0) - (parseFloat(externalCost) || 0)) / (parseFloat(totalAmountInput) || 1)) * 100)}%)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 700, color: '#9a3412', backgroundColor: '#fff7ed', padding: '0.45rem 0.8rem', borderRadius: '6px', border: '1px solid #ffedd5' }}>
+                        <input 
+                          type="checkbox"
+                          checked={autoRecordExpense}
+                          onChange={(e) => setAutoRecordExpense(e.target.checked)}
+                          style={{ accentColor: '#ea580c', cursor: 'pointer', width: '16px', height: '16px' }}
+                        />
+                        تسجيل فاتورة مصروف للورشة تلقائياً في المصاريف
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 {/* 5. Quantity, Price, & Editable Live Total (Bidirectional Smart Calculation) */}
                 <div style={{ padding: '1.1rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--border-color)', marginBottom: '1.25rem' }}>

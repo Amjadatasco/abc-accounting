@@ -213,6 +213,54 @@ const MainApp = () => {
 
         {activeTab === 'settings' && <SettingsView />}
       </main>
+
+      {/* Mobile Bottom Navigation Bar (Optimized for iOS Safari & Phone ergonomics) */}
+      <nav className="mobile-bottom-nav no-print" aria-label="شريط التنقل السريع">
+        <button
+          type="button"
+          className={`mobile-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => handleNavClick('dashboard')}
+        >
+          <span className="mobile-nav-icon">📊</span>
+          <span className="mobile-nav-label">الرئيسية</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-nav-btn ${activeTab === 'sales' ? 'active' : ''}`}
+          onClick={() => handleNavClick('sales')}
+        >
+          <span className="mobile-nav-icon">🛒</span>
+          <span className="mobile-nav-label">المبيعات</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-nav-btn ${activeTab === 'products' ? 'active' : ''}`}
+          onClick={() => handleNavClick('products')}
+        >
+          <span className="mobile-nav-icon">📦</span>
+          <span className="mobile-nav-label">البضائع</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-nav-btn ${activeTab === 'expenses' ? 'active' : ''}`}
+          onClick={() => handleNavClick('expenses')}
+        >
+          <span className="mobile-nav-icon">💳</span>
+          <span className="mobile-nav-label">المصاريف</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-nav-btn ${isMobileMenuOpen || !['dashboard', 'sales', 'products', 'expenses'].includes(activeTab) ? 'active' : ''}`}
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          <span className="mobile-nav-icon">{isMobileMenuOpen ? '✕' : '☰'}</span>
+          <span className="mobile-nav-label">المزيد</span>
+        </button>
+      </nav>
     </div>
   );
 };
