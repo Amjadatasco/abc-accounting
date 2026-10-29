@@ -1122,7 +1122,9 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               accountId: creditAcc.id,
               accountCode: creditAcc.code,
               accountName: creditAcc.name,
-              description: `سداد أو التزام للمورد ${newExp.vendorName}`,
+              description: newExp.status === 'paid' 
+                ? (newExp.paidBy === 'amjad' ? 'تسديد من أمجد (حساب خاص)' : newExp.paidBy === 'nour' ? 'تسديد من نور (حساب خاص)' : 'تسديد من خزينة الشركة')
+                : `التزام مستحق للمورد ${newExp.vendorName}`,
               debit: 0,
               credit: newExp.amount
             }
@@ -1183,7 +1185,9 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             accountId: creditAcc.id,
             accountCode: creditAcc.code,
             accountName: creditAcc.name,
-            description: `سداد أو التزام للمورد ${updatedExp.vendorName}`,
+            description: updatedExp.status === 'paid' 
+              ? (updatedExp.paidBy === 'amjad' ? 'تسديد من أمجد (حساب خاص)' : updatedExp.paidBy === 'nour' ? 'تسديد من نور (حساب خاص)' : 'تسديد من خزينة الشركة')
+              : `التزام مستحق للمورد ${updatedExp.vendorName}`,
             debit: 0,
             credit: updatedExp.amount
           }

@@ -26,7 +26,7 @@ export const ExpensesView: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
   const [taxAmount, setTaxAmount] = useState('0');
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'sham_cash' | 'credit'>('sham_cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'bank' | 'sham_cash' | 'credit'>('cash');
   const [status, setStatus] = useState<'paid' | 'unpaid'>('paid');
   const [notes, setNotes] = useState('');
 
@@ -260,22 +260,46 @@ export const ExpensesView: React.FC = () => {
     }
   };
 
+  const handlePaymentMethodChange = (val: string) => {
+    if (val === 'SWITCH_ABC') {
+      setPaidBy('abc');
+      setPaymentMethod('cash');
+    } else if (val === 'SWITCH_AMJAD') {
+      setPaidBy('amjad');
+      setPaymentMethod('cash');
+    } else if (val === 'SWITCH_NOUR') {
+      setPaidBy('nour');
+      setPaymentMethod('cash');
+    } else {
+      setPaymentMethod(val as any);
+    }
+  };
+
+  const handlePayerSelect = (newPayer: ExpensePayer) => {
+    setPaidBy(newPayer);
+    if (paymentMethod === 'cash') {
+      setPaymentMethod('cash');
+    }
+  };
+
   const openAddExpenseModal = () => {
     setEditingExpense(null);
     setExpenseCurrency('USD');
     if (activeTab === 'amjad') {
       setPaidBy('amjad');
+      setPaymentMethod('cash');
     } else if (activeTab === 'nour') {
       setPaidBy('nour');
+      setPaymentMethod('cash');
     } else {
       setPaidBy('abc');
+      setPaymentMethod('cash');
     }
     setVendorName('');
     setAccountId('');
     setDate(new Date().toISOString().split('T')[0]);
     setAmount('');
     setTaxAmount('0');
-    setPaymentMethod('sham_cash');
     setStatus('paid');
     setNotes('');
     setIsModalOpen(true);
@@ -291,7 +315,7 @@ export const ExpensesView: React.FC = () => {
     setDate(exp.date || new Date().toISOString().split('T')[0]);
     setAmount(String(exp.amount || ''));
     setTaxAmount(String(exp.taxAmount || 0));
-    setPaymentMethod(exp.paymentMethod || 'sham_cash');
+    setPaymentMethod(exp.paymentMethod || 'cash');
     setStatus(exp.status || 'paid');
     setNotes(exp.notes || '');
     setIsModalOpen(true);
@@ -975,8 +999,14 @@ export const ExpensesView: React.FC = () => {
                         <span className="badge badge-gray">{acc ? acc.name : 'مصروف تشغيلي'}</span>
                       </td>
                       <td>
-                        <span style={{ fontSize: '0.85rem' }}>
-                          {exp.paymentMethod === 'sham_cash' ? '📱 محفظة شام كاش' : exp.paymentMethod === 'bank' ? '🏦 تحويل بنكي' : exp.paymentMethod === 'cash' ? '💵 نقداً (صندوق)' : '📋 آجل (ذمم)'}
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                          {exp.paymentMethod === 'sham_cash' ? (
+                            exp.paidBy === 'amjad' ? '📱 شام كاش (أمجد)' : exp.paidBy === 'nour' ? '📱 شام كاش (نور)' : '📱 شام كاش (الشركة)'
+                          ) : exp.paymentMethod === 'bank' ? (
+                            exp.paidBy === 'amjad' ? '🏦 بنك (أمجد)' : exp.paidBy === 'nour' ? '🏦 بنك (نور)' : '🏦 تحويل بنكي'
+                          ) : exp.paymentMethod === 'cash' ? (
+                            exp.paidBy === 'amjad' ? '👤 تسديد من أمجد' : exp.paidBy === 'nour' ? '👤 تسديد من نور' : '🏢 تسديد من الخزينة'
+                          ) : '📋 آجل (ذمم)'}
                         </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
@@ -1099,7 +1129,7 @@ export const ExpensesView: React.FC = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.65rem' }}>
                     {/* Option: ABC */}
                     <div 
-                      onClick={() => setPaidBy('abc')}
+                      onClick={() => handlePayerSelect('abc')}
                       style={{
                         padding: '0.75rem 0.85rem',
                         borderRadius: 'var(--radius-md)',
@@ -1118,7 +1148,7 @@ export const ExpensesView: React.FC = () => {
                           type="radio" 
                           name="paidBy" 
                           checked={paidBy === 'abc'} 
-                          onChange={() => setPaidBy('abc')} 
+                          onChange={() => handlePayerSelect('abc')} 
                           style={{ cursor: 'pointer' }}
                         />
                       </div>
@@ -1129,7 +1159,7 @@ export const ExpensesView: React.FC = () => {
 
                     {/* Option: Amjad */}
                     <div 
-                      onClick={() => setPaidBy('amjad')}
+                      onClick={() => handlePayerSelect('amjad')}
                       style={{
                         padding: '0.75rem 0.85rem',
                         borderRadius: 'var(--radius-md)',
@@ -1148,7 +1178,7 @@ export const ExpensesView: React.FC = () => {
                           type="radio" 
                           name="paidBy" 
                           checked={paidBy === 'amjad'} 
-                          onChange={() => setPaidBy('amjad')} 
+                          onChange={() => handlePayerSelect('amjad')} 
                           style={{ cursor: 'pointer' }}
                         />
                       </div>
@@ -1159,7 +1189,7 @@ export const ExpensesView: React.FC = () => {
 
                     {/* Option: Nour */}
                     <div 
-                      onClick={() => setPaidBy('nour')}
+                      onClick={() => handlePayerSelect('nour')}
                       style={{
                         padding: '0.75rem 0.85rem',
                         borderRadius: 'var(--radius-md)',
@@ -1178,7 +1208,7 @@ export const ExpensesView: React.FC = () => {
                           type="radio" 
                           name="paidBy" 
                           checked={paidBy === 'nour'} 
-                          onChange={() => setPaidBy('nour')} 
+                          onChange={() => handlePayerSelect('nour')} 
                           style={{ cursor: 'pointer' }}
                         />
                       </div>
@@ -1329,17 +1359,84 @@ export const ExpensesView: React.FC = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">طريقة السداد *</label>
+                    <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
+                      <span>طريقة السداد *</span>
+                      <span style={{ 
+                        fontSize: '0.74rem', 
+                        fontWeight: 800, 
+                        color: paidBy === 'amjad' ? '#1d4ed8' : paidBy === 'nour' ? '#15803d' : '#334155',
+                        backgroundColor: paidBy === 'amjad' ? '#eff6ff' : paidBy === 'nour' ? '#f0fdf4' : '#f1f5f9',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '4px',
+                        border: `1px solid ${paidBy === 'amjad' ? '#bfdbfe' : paidBy === 'nour' ? '#bbf7d0' : '#cbd5e1'}`
+                      }}>
+                        حسب الاختيار السابق: {paidBy === 'amjad' ? '👤 تسديد من أمجد' : paidBy === 'nour' ? '👤 تسديد من نور' : '🏢 تسديد من الخزينة'}
+                      </span>
+                    </label>
                     <select 
                       className="form-select" 
                       value={paymentMethod} 
-                      onChange={(e) => setPaymentMethod(e.target.value as any)}
+                      onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                      style={{
+                        borderColor: paidBy === 'amjad' ? '#3b82f6' : paidBy === 'nour' ? '#22c55e' : '#94a3b8',
+                        fontWeight: 700,
+                        fontSize: '0.92rem'
+                      }}
                     >
-                      <option value="sham_cash">📱 محفظة شام كاش (Sham Cash)</option>
-                      <option value="cash">نقداً من الخزينة (Cash)</option>
-                      <option value="bank">حساب بنكي (Bank Transfer)</option>
-                      <option value="credit">آجل على الحساب (Payable)</option>
+                      {/* الخيارات المتوافقة مع الجهة المسددة المختارة سابقاً */}
+                      {paidBy === 'abc' && (
+                        <>
+                          <option value="cash">🏢 تسديد نقداً من الخزينة (Cash)</option>
+                          <option value="sham_cash">📱 محفظة شام كاش (شركة ABC)</option>
+                          <option value="bank">🏦 حساب بنكي للشركة (Bank Transfer)</option>
+                          <option value="credit">⏳ آجل على الحساب / التزام (Payable)</option>
+                        </>
+                      )}
+
+                      {paidBy === 'amjad' && (
+                        <>
+                          <option value="cash">👤 تسديد من أمجد (نقداً من حسابه الخاص)</option>
+                          <option value="sham_cash">📱 محفظة شام كاش (أمجد)</option>
+                          <option value="bank">🏦 حساب بنكي شخصي (أمجد)</option>
+                          <option value="credit">⏳ آجل على الحساب / التزام (Payable)</option>
+                        </>
+                      )}
+
+                      {paidBy === 'nour' && (
+                        <>
+                          <option value="cash">👤 تسديد من نور (نقداً من حسابه الخاص)</option>
+                          <option value="sham_cash">📱 محفظة شام كاش (نور)</option>
+                          <option value="bank">🏦 حساب بنكي شخصي (نور)</option>
+                          <option value="credit">⏳ آجل على الحساب / التزام (Payable)</option>
+                        </>
+                      )}
+
+                      {/* إمكانية التبديل المباشر بين مصادر السداد من القائمة */}
+                      <optgroup label="─── أو تبديل جهة السداد مباشرة ───">
+                        {paidBy !== 'abc' && <option value="SWITCH_ABC">🏢 تسديد من الخزينة (شركة ABC)</option>}
+                        {paidBy !== 'amjad' && <option value="SWITCH_AMJAD">👤 تسديد من أمجد (حساب أمجد الخاص)</option>}
+                        {paidBy !== 'nour' && <option value="SWITCH_NOUR">👤 تسديد من نور (حساب نور الخاص)</option>}
+                      </optgroup>
                     </select>
+
+                    <div style={{ 
+                      marginTop: '0.4rem', 
+                      padding: '0.4rem 0.65rem', 
+                      borderRadius: '6px', 
+                      backgroundColor: paidBy === 'amjad' ? '#eff6ff' : paidBy === 'nour' ? '#f0fdf4' : '#f8fafc',
+                      border: `1px solid ${paidBy === 'amjad' ? '#dbeafe' : paidBy === 'nour' ? '#dcfce7' : '#e2e8f0'}`,
+                      fontSize: '0.75rem', 
+                      color: paidBy === 'amjad' ? '#1d4ed8' : paidBy === 'nour' ? '#15803d' : '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}>
+                      <span>
+                        {paidBy === 'amjad' && '💡 تم تحديد [تسديد من أمجد]: سيُسجل هذا المصروف لحساب أمجد ويُحتسب لصالحه في جرد وتصفية الشركاء.'}
+                        {paidBy === 'nour' && '💡 تم تحديد [تسديد من نور]: سيُسجل هذا المصروف لحساب نور ويُحتسب لصالحه في جرد وتصفية الشركاء.'}
+                        {paidBy === 'abc' && '💡 تم تحديد [تسديد من الخزينة]: سيُخصم هذا المصروف مباشرة من صندوق وأموال شركة ABC.'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
