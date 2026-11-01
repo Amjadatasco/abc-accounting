@@ -185,6 +185,7 @@ export interface Invoice {
   status: 'paid' | 'partial' | 'unpaid';
   paidAmount: number;
   notes?: string;
+  internalNotes?: string;
   externalSupplierName?: string;
   externalCost?: number;
   externalPaymentMethod?: 'cash' | 'bank' | 'sham_cash' | 'credit';

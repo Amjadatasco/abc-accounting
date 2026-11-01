@@ -57,6 +57,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   const [partialAmount, setPartialAmount] = useState('');
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
 
   const currSym = currency === 'SYP' ? 'ل.س' : '$';
 
@@ -123,6 +124,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
 
   // Preset services & products for fast 1-click selection
   const servicePresets = [
+    'طباعة ألبسة DTF (بالمتر الجر)',
+    'طباعة UV مسطحة أكريليك وخشب',
     'طباعة كتب ومجلات',
     'طباعة بروشورات وفلايرات',
     'كروت عمل شخصية (Business Cards)',
@@ -262,7 +265,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       paymentMethod,
       status: finalStatus,
       paidAmount,
-      notes: notes || (isExternal ? `تنفيذ خارجي (${externalSupplier.trim()}): ${itemTrimmed}` : saleType === 'service' ? `تقديم خدمة: ${itemTrimmed}` : `بيع منتج: ${itemTrimmed}`),
+      notes: notes.trim(),
+      internalNotes: internalNotes.trim(),
       externalSupplierName: isExternal ? externalSupplier.trim() : undefined,
       externalCost: isExternal && extCostNum > 0 ? extCostNum : undefined,
       externalPaymentMethod: isExternal ? externalPaymentMethod : undefined,
@@ -327,6 +331,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     setTotalAmountInput('');
     setPartialAmount('');
     setNotes('');
+    setInternalNotes('');
     setExternalSupplier('');
     setExternalCost('');
     setExternalPaymentMethod('cash');
@@ -871,6 +876,12 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                           <div style={{ fontSize: '0.72rem', color: '#c2410c', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                             <span>🏭 ورشة: <strong>{sale.externalSupplierName}</strong></span>
                             {sale.externalCost ? <span style={{ color: '#9a3412', fontWeight: 700 }}>(تكلفة: {saleSym} {sale.externalCost.toLocaleString()})</span> : null}
+                          </div>
+                        )}
+                        {sale.internalNotes && (
+                          <div style={{ fontSize: '0.73rem', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde68a', padding: '0.15rem 0.45rem', borderRadius: '4px', marginTop: '0.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>🔒 خاص:</span>
+                            <span style={{ fontWeight: 600 }}>{sale.internalNotes}</span>
                           </div>
                         )}
                       </td>
@@ -1468,16 +1479,60 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                   )}
                 </div>
 
-                {/* 7. Notes */}
-                <div className="form-group">
-                  <label className="form-label">ملاحظات إضافية (شروط تسليم، تفاصيل المقاس أو اللون...)</label>
-                  <textarea 
-                    className="form-textarea" 
-                    rows={2} 
-                    placeholder="أي تعليمات إضافية عن العملية..."
-                    value={notes} 
-                    onChange={(e) => setNotes(e.target.value)} 
-                  />
+                {/* 7. Notes: Private Internal Notes & Customer Notes */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+                  {/* Private Internal Notes */}
+                  <div className="form-group" style={{ 
+                    padding: '0.85rem 1rem', 
+                    backgroundColor: '#fffbeb', 
+                    borderRadius: '8px', 
+                    border: '1.5px solid #fde68a',
+                    margin: 0
+                  }}>
+                    <label className="form-label" style={{ fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>🔒</span>
+                        <span>ملاحظات خاصة بي (سرية للإدارة)</span>
+                      </span>
+                      <span style={{ fontSize: '0.72rem', backgroundColor: '#fef3c7', color: '#b45309', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
+                        لا تظهر للعميل
+                      </span>
+                    </label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows={2} 
+                      placeholder="أي ملاحظة أو تذكير خاص بك (تكلفة داخلية، اسم الفني، اتفاق خاص...) لن تظهر في الفاتورة المطبوعة نهائياً..."
+                      value={internalNotes} 
+                      onChange={(e) => setInternalNotes(e.target.value)} 
+                      style={{ backgroundColor: '#ffffff', borderColor: '#fcd34d' }}
+                    />
+                  </div>
+
+                  {/* Customer Notes */}
+                  <div className="form-group" style={{ 
+                    padding: '0.85rem 1rem', 
+                    backgroundColor: '#f8fafc', 
+                    borderRadius: '8px', 
+                    border: '1.5px solid var(--border-color)',
+                    margin: 0
+                  }}>
+                    <label className="form-label" style={{ fontWeight: 700, color: 'var(--text-dark)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <span>📄</span>
+                        <span>ملاحظات وشروط تظهر للعميل</span>
+                      </span>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        (تطبع بالفاتورة)
+                      </span>
+                    </label>
+                    <textarea 
+                      className="form-textarea" 
+                      rows={2} 
+                      placeholder="شروط تسليم، موعد الجاهزية، فحص البضاعة، مواعيد الاستلام... (اختياري)"
+                      value={notes} 
+                      onChange={(e) => setNotes(e.target.value)} 
+                    />
+                  </div>
                 </div>
               </div>
 

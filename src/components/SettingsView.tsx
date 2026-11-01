@@ -21,6 +21,10 @@ export const SettingsView: React.FC = () => {
   const [formData, setFormData] = useState<CompanySettings>(companySettings);
   const [successMsg, setSuccessMsg] = useState('');
 
+  React.useEffect(() => {
+    setFormData(companySettings);
+  }, [companySettings]);
+
   // Supabase Cloud Configuration state
   const currentConfig = getSupabaseConfig();
   const [supabaseUrl, setSupabaseUrl] = useState(currentConfig.url);

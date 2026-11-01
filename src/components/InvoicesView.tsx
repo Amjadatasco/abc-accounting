@@ -47,6 +47,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
     { description: '', quantity: 1, unitPrice: 0, taxRate: 0, total: 0 }
   ]);
   const [notes, setNotes] = useState('');
+  const [internalNotes, setInternalNotes] = useState('');
   const [initialPaid, setInitialPaid] = useState('0');
 
   const customers = contacts.filter(c => c.type === 'customer' || c.type === 'both');
@@ -132,7 +133,8 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
       productionSource: invoiceSource,
       status,
       paidAmount: paid,
-      notes
+      notes: notes.trim(),
+      internalNotes: internalNotes.trim()
     });
 
     // Reset
@@ -141,6 +143,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
     setCustomerNameInput('');
     setItems([{ description: '', quantity: 1, unitPrice: 0, taxRate: 0, total: 0 }]);
     setNotes('');
+    setInternalNotes('');
     setInitialPaid('0');
     setModalOpen(false);
   };
@@ -309,7 +312,15 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                         {srcInfo.icon} {srcInfo.label}
                       </span>
                     </td>
-                    <td style={{ fontWeight: 600 }}>{inv.customerName}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {inv.customerName}
+                      {inv.internalNotes && (
+                        <div style={{ fontSize: '0.73rem', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde68a', padding: '0.15rem 0.45rem', borderRadius: '4px', marginTop: '0.25rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <span>🔒 خاص:</span>
+                          <span style={{ fontWeight: 600 }}>{inv.internalNotes}</span>
+                        </div>
+                      )}
+                    </td>
                     <td style={{ fontSize: '0.85rem' }}>{inv.date}</td>
                     <td style={{ fontSize: '0.85rem', color: remaining > 0 ? '#b45309' : 'var(--text-muted)' }}>
                       {inv.dueDate}
@@ -632,12 +643,48 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                       />
                     </div>
 
-                    <div className="form-group" style={{ margin: 0, flex: 1 }}>
-                      <label className="form-label">ملاحظات وشروط الفاتورة</label>
+                    {/* Private Internal Notes */}
+                    <div className="form-group" style={{ 
+                      margin: 0, 
+                      padding: '0.75rem 0.85rem', 
+                      backgroundColor: '#fffbeb', 
+                      borderRadius: '8px', 
+                      border: '1.5px solid #fde68a' 
+                    }}>
+                      <label className="form-label" style={{ fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>🔒</span>
+                          <span>ملاحظات خاصة بي (سرية للإدارة)</span>
+                        </span>
+                        <span style={{ fontSize: '0.7rem', backgroundColor: '#fef3c7', color: '#b45309', padding: '0.1rem 0.35rem', borderRadius: '4px', border: '1px solid #fde68a' }}>
+                          لا تظهر للعميل بالفاتورة
+                        </span>
+                      </label>
                       <textarea 
                         className="form-textarea" 
                         rows={2} 
-                        placeholder="أي تفاصيل أو شروط تسليم، طريقة الدفع..."
+                        placeholder="أي تفاصيل خاصة بك أو بالورشة (لن تطبع ولن يراها العميل)..."
+                        value={internalNotes}
+                        onChange={(e) => setInternalNotes(e.target.value)}
+                        style={{ resize: 'vertical', backgroundColor: '#ffffff', borderColor: '#fcd34d' }}
+                      />
+                    </div>
+
+                    {/* Customer Notes */}
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>📄</span>
+                          <span>ملاحظات وشروط تظهر للعميل في الفاتورة</span>
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          (اختياري)
+                        </span>
+                      </label>
+                      <textarea 
+                        className="form-textarea" 
+                        rows={2} 
+                        placeholder="أي تفاصيل أو شروط تسليم تود طباعتها في الفاتورة للعميل..."
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         style={{ resize: 'vertical' }}

@@ -194,9 +194,34 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
 
+  const sanitizeCompanySettings = (settings: any): CompanySettings => {
+    if (!settings) return initialCompanySettings;
+    const isOldLegacy = 
+      settings.companyName?.includes('للخدمات والتجارة') || 
+      settings.companyName === 'مطبعة وإعلانات ABC' ||
+      settings.tagline?.includes('الأعمال الذكية') ||
+      settings.taxNumber === '300123456700003' ||
+      settings.commercialRecord === '1010456789';
+
+    if (isOldLegacy) {
+      return {
+        ...settings,
+        companyName: 'ABC للطباعة والإعلان',
+        tagline: 'خدمات الطباعة والإعلان والدعاية',
+        taxNumber: settings.taxNumber === '300123456700003' ? '' : (settings.taxNumber || ''),
+        commercialRecord: settings.commercialRecord === '1010456789' ? '' : (settings.commercialRecord || '')
+      };
+    }
+    return settings as CompanySettings;
+  };
+
   const [companySettings, setCompanySettings] = useState<CompanySettings>(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY}_settings`);
-    return saved ? JSON.parse(saved) : initialCompanySettings;
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY}_settings`);
+      return saved ? sanitizeCompanySettings(JSON.parse(saved)) : initialCompanySettings;
+    } catch {
+      return initialCompanySettings;
+    }
   });
 
   // Save changes to localStorage
@@ -635,7 +660,15 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // 7. Settings sync
       const settingsRow = (setRes.data || []).find((r: any) => r.id === 'default');
       if (settingsRow && settingsRow.data) {
-        setCompanySettings(settingsRow.data as CompanySettings);
+        const sanitized = sanitizeCompanySettings(settingsRow.data);
+        setCompanySettings(sanitized);
+        if (JSON.stringify(sanitized) !== JSON.stringify(settingsRow.data)) {
+          await client.from('accounting_settings').upsert({
+            id: 'default',
+            data: sanitized,
+            updated_at: new Date().toISOString(),
+          });
+        }
       } else {
         await client.from('accounting_settings').upsert({
           id: 'default',
