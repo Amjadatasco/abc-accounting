@@ -3,7 +3,7 @@ import { useAccounting } from '../context/AccountingContext';
 import type { Currency, ExpensePayer, ExpenseBill } from '../types/accounting';
 
 export const ExpensesView: React.FC = () => {
-  const { expenses, accounts, contacts, addExpense, updateExpense, deleteExpense, addContact } = useAccounting();
+  const { expenses, accounts, contacts, addExpense, updateExpense, deleteExpense, addContact, addAccount } = useAccounting();
 
   // Sub-pages / Tabs
   const [activeTab, setActiveTab] = useState<'all' | 'abc' | 'amjad' | 'nour' | 'reconciliation'>('all');
@@ -23,6 +23,8 @@ export const ExpensesView: React.FC = () => {
   const [exchangeRate, setExchangeRate] = useState<string>(() => localStorage.getItem('last_dollar_rate') || '14800');
   const [vendorName, setVendorName] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [isCustomAccount, setIsCustomAccount] = useState(false);
+  const [customAccountName, setCustomAccountName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
   const [taxAmount, setTaxAmount] = useState('0');
@@ -39,7 +41,47 @@ export const ExpensesView: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const nameTrimmed = vendorName.trim();
-    if (!accountId || !amount || !nameTrimmed) {
+
+    let finalAccountId = accountId;
+
+    if (isCustomAccount) {
+      const trimmedCustomName = customAccountName.trim();
+      if (!trimmedCustomName) {
+        alert('يرجى كتابة اسم بند المصروف الجديد.');
+        return;
+      }
+
+      // Check if an account with this name already exists
+      const existingAcc = accounts.find(a => a.name.trim().toLowerCase() === trimmedCustomName.toLowerCase());
+      if (existingAcc) {
+        finalAccountId = existingAcc.id;
+      } else {
+        // Calculate next code for expense category (e.g. 5610, 5620, etc.)
+        const expCodes = accounts
+          .filter(a => a.category === 'expense')
+          .map(a => parseInt(a.code) || 0)
+          .filter(c => c >= 5000 && c < 6000);
+        const maxCode = expCodes.length > 0 ? Math.max(...expCodes) : 5600;
+        const nextCode = String(maxCode + 10);
+        const newAccId = `acc_${Date.now()}`;
+
+        const newAccount = {
+          id: newAccId,
+          code: nextCode,
+          name: trimmedCustomName,
+          category: 'expense' as const,
+          type: 'debit' as const,
+          balance: 0,
+          parentId: 'acc_5000',
+          isSystem: false
+        };
+
+        const createdAcc = addAccount(newAccount);
+        finalAccountId = createdAcc.id;
+      }
+    }
+
+    if (!finalAccountId || !amount || !nameTrimmed) {
       alert('يرجى تحديد اسم المورد، وحساب المصروف، والمبلغ.');
       return;
     }
@@ -68,7 +110,7 @@ export const ExpensesView: React.FC = () => {
         ...editingExpense,
         vendorId: finalVendorId,
         vendorName: nameTrimmed,
-        accountId,
+        accountId: finalAccountId,
         date,
         amount: finalAmount,
         taxAmount: parseFloat(taxAmount) || 0,
@@ -87,7 +129,7 @@ export const ExpensesView: React.FC = () => {
         billNumber,
         vendorId: finalVendorId,
         vendorName: nameTrimmed,
-        accountId,
+        accountId: finalAccountId,
         date,
         amount: finalAmount,
         taxAmount: parseFloat(taxAmount) || 0,
@@ -110,6 +152,8 @@ export const ExpensesView: React.FC = () => {
     setPaidBy('abc');
     setVendorName('');
     setAccountId('');
+    setIsCustomAccount(false);
+    setCustomAccountName('');
     setAmount('');
     setTaxAmount('0');
     setNotes('');
@@ -297,6 +341,8 @@ export const ExpensesView: React.FC = () => {
     }
     setVendorName('');
     setAccountId('');
+    setIsCustomAccount(false);
+    setCustomAccountName('');
     setDate(new Date().toISOString().split('T')[0]);
     setAmount('');
     setTaxAmount('0');
@@ -312,6 +358,8 @@ export const ExpensesView: React.FC = () => {
     setExchangeRate(String(exp.exchangeRate || 14800));
     setVendorName(exp.vendorName || '');
     setAccountId(exp.accountId || '');
+    setIsCustomAccount(false);
+    setCustomAccountName('');
     setDate(exp.date || new Date().toISOString().split('T')[0]);
     setAmount(String(exp.amount || ''));
     setTaxAmount(String(exp.taxAmount || 0));
@@ -1075,7 +1123,7 @@ export const ExpensesView: React.FC = () => {
               <h3>
                 {editingExpense ? `✏️ تعديل بيانات القيد / المصروف (${editingExpense.billNumber})` : 'تسجيل مصروف أو فاتورة مشتريات'}
               </h3>
-              <button className="modal-close" onClick={() => { setIsModalOpen(false); setEditingExpense(null); }}>×</button>
+              <button className="modal-close" onClick={() => { setIsModalOpen(false); setEditingExpense(null); setIsCustomAccount(false); setCustomAccountName(''); }}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -1311,18 +1359,88 @@ export const ExpensesView: React.FC = () => {
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">بند المصروف (من شجرة الحسابات) *</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                      <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>بند المصروف (من شجرة الحسابات) *</label>
+                      {!isCustomAccount && (
+                        <button 
+                          type="button" 
+                          onClick={() => { setIsCustomAccount(true); setAccountId(''); }}
+                          style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            color: '#1d4ed8', 
+                            fontSize: '0.78rem', 
+                            fontWeight: 800, 
+                            cursor: 'pointer', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '0.2rem',
+                            padding: 0
+                          }}
+                        >
+                          <span>+ أخرى (إضافة بند جديد)</span>
+                        </button>
+                      )}
+                    </div>
+
                     <select 
                       className="form-select" 
-                      required 
-                      value={accountId} 
-                      onChange={(e) => setAccountId(e.target.value)}
+                      required={!isCustomAccount}
+                      value={isCustomAccount ? '__other__' : accountId} 
+                      onChange={(e) => {
+                        if (e.target.value === '__other__') {
+                          setIsCustomAccount(true);
+                          setAccountId('');
+                        } else {
+                          setIsCustomAccount(false);
+                          setAccountId(e.target.value);
+                        }
+                      }}
                     >
                       <option value="">-- اختر حساب المصروف --</option>
                       {expenseAccounts.map(a => (
                         <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
                       ))}
+                      <option value="__other__" style={{ fontWeight: 800, color: '#166534', backgroundColor: '#f0fdf4' }}>
+                        ✨ + أخرى (كتابة بند مصروف جديد وحفظه دائماً)...
+                      </option>
                     </select>
+
+                    {isCustomAccount && (
+                      <div style={{
+                        marginTop: '0.65rem',
+                        padding: '0.75rem 0.9rem',
+                        backgroundColor: '#f0fdf4',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1.5px solid #86efac'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                          <label style={{ fontWeight: 800, fontSize: '0.86rem', color: '#166534', margin: 0 }}>
+                            ✏️ اسم بند المصروف الجديد *
+                          </label>
+                          <button 
+                            type="button" 
+                            style={{ background: 'none', border: 'none', color: '#15803d', fontSize: '0.78rem', cursor: 'pointer', textDecoration: 'underline' }}
+                            onClick={() => { setIsCustomAccount(false); setCustomAccountName(''); }}
+                          >
+                            العودة للقائمة المعتمدة
+                          </button>
+                        </div>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          required={isCustomAccount}
+                          placeholder="اكتب اسم البند (مثال: صيانة سيارة، ترخيص، محروقات، سفر...)" 
+                          value={customAccountName} 
+                          onChange={(e) => setCustomAccountName(e.target.value)} 
+                          style={{ backgroundColor: 'white', borderColor: '#86efac', fontWeight: 600 }}
+                          autoFocus
+                        />
+                        <span style={{ fontSize: '0.74rem', color: '#15803d', marginTop: '0.3rem', display: 'block' }}>
+                          ✨ سيتم حفظ هذا البند تلقائياً في شجرة الحسابات وقائمة المصروفات وسيبقى متاحاً دائماً في القائمة.
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="form-group">
@@ -1481,7 +1599,7 @@ export const ExpensesView: React.FC = () => {
                 <button 
                   type="button" 
                   className="btn btn-outline" 
-                  onClick={() => { setIsModalOpen(false); setEditingExpense(null); }}
+                  onClick={() => { setIsModalOpen(false); setEditingExpense(null); setIsCustomAccount(false); setCustomAccountName(''); }}
                 >
                   إلغاء
                 </button>

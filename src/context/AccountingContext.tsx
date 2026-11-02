@@ -54,7 +54,7 @@ interface AccountingContextType {
   pushAllToCloud: () => Promise<boolean>;
 
   // Actions
-  addAccount: (account: Omit<Account, 'id'>) => void;
+  addAccount: (account: Omit<Account, 'id'> & { id?: string }) => Account;
   deleteAccount: (id: string) => boolean;
   addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => { success: boolean; error?: string };
   addInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => void;
@@ -726,9 +726,9 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
   // Add Account
-  const addAccount = (newAcc: Omit<Account, 'id'>) => {
-    const id = `acc_${Date.now()}`;
-    const accountObj = { ...newAcc, id };
+  const addAccount = (newAcc: Omit<Account, 'id'> & { id?: string }): Account => {
+    const id = newAcc.id || `acc_${Date.now()}`;
+    const accountObj: Account = { ...newAcc, id };
     setAccounts(prev => [...prev, accountObj]);
     syncRowToCloud('accounting_accounts', {
       id,
@@ -738,6 +738,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       data: accountObj,
       updated_at: new Date().toISOString(),
     });
+    return accountObj;
   };
 
   const deleteAccount = (id: string): boolean => {
