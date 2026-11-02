@@ -16,8 +16,123 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({ invoice, o
   const [docTitle, setDocTitle] = useState<'فاتورة مبيعات' | 'أمر تشغيل وطباعة' | 'عرض سعر' | 'فاتورة ضريبية'>('فاتورة مبيعات');
   const [showWorkType, setShowWorkType] = useState(false);
 
+  React.useEffect(() => {
+    document.body.classList.add('has-print-modal');
+    return () => {
+      document.body.classList.remove('has-print-modal');
+    };
+  }, []);
+
   const handlePrint = () => {
-    window.print();
+    const printArea = document.getElementById('invoice-printable-area');
+    if (!printArea) {
+      window.print();
+      return;
+    }
+
+    try {
+      const existingIframe = document.getElementById('print-invoice-iframe');
+      if (existingIframe) existingIframe.remove();
+
+      const iframe = document.createElement('iframe');
+      iframe.id = 'print-invoice-iframe';
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      iframe.style.zIndex = '-9999';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) {
+        window.print();
+        return;
+      }
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html dir="rtl" lang="ar">
+        <head>
+          <meta charset="utf-8">
+          <title>فاتورة ${invoice.invoiceNumber} - ${companySettings.companyName || 'ABC للطباعة والإعلان'}</title>
+          <link rel="preconnect" href="https://fonts.googleapis.com">
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+          <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+          <style>
+            *, *::before, *::after {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+              font-family: 'Tajawal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            body {
+              direction: rtl;
+              padding: 24px;
+              background-color: #ffffff;
+              color: #0f172a;
+              line-height: 1.5;
+              font-size: 13px;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            th, td {
+              border-bottom: 1px solid #cbd5e1;
+            }
+            .badge {
+              display: inline-block;
+              border-radius: 4px;
+              font-weight: 800;
+            }
+            .badge-green {
+              background-color: #f0fdf4 !important;
+              color: #166534 !important;
+              border: 1px solid #bbf7d0 !important;
+            }
+            .badge-orange {
+              background-color: #fff7ed !important;
+              color: #c2410c !important;
+              border: 1px solid #fed7aa !important;
+            }
+            .badge-red {
+              background-color: #fef2f2 !important;
+              color: #b91c1c !important;
+              border: 1px solid #fecaca !important;
+            }
+            @page {
+              size: A4 portrait;
+              margin: 10mm 10mm;
+            }
+            @media print {
+              body {
+                padding: 0 !important;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          ${printArea.innerHTML}
+        </body>
+        </html>
+      `);
+      doc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          iframe.remove();
+        }, 2000);
+      }, 350);
+    } catch {
+      window.print();
+    }
   };
 
   const hasTax = (invoice.taxAmount && invoice.taxAmount > 0) || invoice.items.some(i => i.taxRate && i.taxRate > 0);
@@ -110,7 +225,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({ invoice, o
         )}
 
         {/* Printable Invoice Body */}
-        <div className="modal-body printable-invoice" style={{ padding: '2.5rem', backgroundColor: 'white' }}>
+        <div id="invoice-printable-area" className="modal-body printable-invoice" style={{ padding: '2.5rem', backgroundColor: 'white' }}>
           
           {/* Header Row: Company Brand & Invoice Meta */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid var(--primary-color)', paddingBottom: '1.25rem', marginBottom: '1.5rem' }}>

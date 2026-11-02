@@ -961,24 +961,161 @@ tbody tr:last-child td {
   }
 }
 
-/* Print Stylesheet */
+/* ================================================================
+   Print Stylesheet (Universal, Modal-proof, and Paper-friendly)
+   ================================================================ */
 @media print {
-  body {
-    background-color: white !important;
-    color: black !important;
+  /* 1. Page setup: Standard A4 portrait with clean margins */
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm;
   }
-  .sidebar, .top-header, .header-actions, .btn, .modal-close, .modal-footer, .no-print, .mobile-topbar, .mobile-backdrop {
+
+  /* 2. Reset root and layout constraints that break paged media */
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  html, body {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 12pt;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  #root, .app-container, .main-content {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  /* 3. Hide non-printable app shell elements */
+  .sidebar,
+  .mobile-topbar,
+  .mobile-bottom-nav,
+  .mobile-backdrop,
+  .top-header,
+  .header-actions,
+  .stats-grid,
+  .no-print,
+  .btn,
+  .modal-close,
+  .modal-header,
+  .modal-footer,
+  header,
+  nav,
+  aside {
     display: none !important;
   }
-  .app-container, .main-content {
+
+  /* 4. If a modal is open, HIDE background page views and tables */
+  body.has-print-modal .main-content > *:not(.modal-overlay),
+  body.has-print-modal .top-header,
+  body.has-print-modal .stats-grid,
+  body.has-print-modal .table-card {
+    display: none !important;
+  }
+
+  /* 5. Complete de-modalization of .modal-overlay for printing */
+  .modal-overlay {
+    position: static !important;
+    inset: auto !important;
     display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     padding: 0 !important;
     margin: 0 !important;
+    overflow: visible !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    z-index: auto !important;
   }
-  .printable-invoice, .printable-report {
-    box-shadow: none !important;
-    border: none !important;
+
+  /* 6. Complete de-modalization of .modal-content for printing */
+  .modal-content,
+  .modal-content.modal-lg {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
     padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+    background: transparent !important;
+    transform: none !important;
+  }
+
+  /* 7. Printable Body and Tables */
+  .modal-body,
+  .modal-body.printable-invoice,
+  .printable-invoice,
+  .printable-report {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    border: none !important;
+  }
+
+  .printable-invoice table,
+  .printable-report table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  .printable-invoice tr,
+  .printable-report tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .printable-invoice th,
+  .printable-invoice td {
+    padding: 8px 10px !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+
+  .printable-invoice thead {
+    display: table-header-group !important;
   }
 }
 
