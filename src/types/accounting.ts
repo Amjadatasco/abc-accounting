@@ -178,6 +178,8 @@ export interface Invoice {
   totalAmount: number;
   currency?: Currency;
   currencySymbol?: string;
+  exchangeRate?: number; // سعر صرف 1 دولار مقابل الليرة السورية في هذا اليوم
+  equivalentAmount?: number; // المبلغ المعادل بالعملة المقابلة
   saleType?: 'service' | 'product' | 'external';
   productionSource?: ProductionSource;
   assetId?: string;

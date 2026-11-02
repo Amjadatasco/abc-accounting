@@ -50,6 +50,8 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
   const [notes, setNotes] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
   const [initialPaid, setInitialPaid] = useState('0');
+  const [exchangeRate, setExchangeRate] = useState<string>(() => localStorage.getItem('last_dollar_rate') || '14800');
+  const currentRateNum = parseFloat(exchangeRate) || 14800;
 
   const customers = contacts.filter(c => c.type === 'customer' || c.type === 'both');
 
@@ -105,6 +107,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
     setNotes('');
     setInternalNotes('');
     setInitialPaid('0');
+    setExchangeRate(localStorage.getItem('last_dollar_rate') || '14800');
     setModalOpen(true);
   };
 
@@ -112,6 +115,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
     setEditingInvoice(inv);
     setInvoiceCurrency(inv.currency || 'USD');
     setInvoiceSource(inv.productionSource || 'uv');
+    setExchangeRate(inv.exchangeRate ? String(inv.exchangeRate) : (localStorage.getItem('last_dollar_rate') || '14800'));
     setCustomerNameInput(inv.customerName || '');
     setDate(inv.date || new Date().toISOString().split('T')[0]);
     setDueDate(inv.dueDate || inv.date || new Date().toISOString().split('T')[0]);
@@ -157,6 +161,10 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
 
     const paid = parseFloat(initialPaid) || 0;
     const status = paid >= grandTotal ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
+    const finalRate = parseFloat(exchangeRate) || 14800;
+    const finalEquivalent = invoiceCurrency === 'USD'
+      ? grandTotal * finalRate
+      : finalRate > 0 ? grandTotal / finalRate : 0;
 
     if (editingInvoice) {
       updateInvoice({
@@ -171,6 +179,8 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
         totalAmount: grandTotal,
         currency: invoiceCurrency,
         currencySymbol: formCurrSym,
+        exchangeRate: finalRate,
+        equivalentAmount: Math.round(finalEquivalent * 100) / 100,
         productionSource: invoiceSource,
         status,
         paidAmount: paid,
@@ -191,6 +201,8 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
         totalAmount: grandTotal,
         currency: invoiceCurrency,
         currencySymbol: formCurrSym,
+        exchangeRate: finalRate,
+        equivalentAmount: Math.round(finalEquivalent * 100) / 100,
         productionSource: invoiceSource,
         status,
         paidAmount: paid,
@@ -392,9 +404,22 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                       <span className="badge" style={{ backgroundColor: isSyp ? '#f0fdf4' : '#eff6ff', color: isSyp ? '#166534' : '#1e40af', border: `1px solid ${isSyp ? '#bbf7d0' : '#bfdbfe'}`, fontSize: '0.75rem', fontWeight: 700 }}>
                         {isSyp ? '🇸🇾 سوري' : '💵 دولار'}
                       </span>
+                      {inv.exchangeRate ? (
+                        <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                          1$ = {Number(inv.exchangeRate).toLocaleString()} ل.س
+                        </div>
+                      ) : null}
                     </td>
                     <td style={{ textAlign: 'left', fontWeight: 800 }}>
-                      {invSym} {inv.totalAmount.toLocaleString()}
+                      <div>{invSym} {inv.totalAmount.toLocaleString()}</div>
+                      {inv.exchangeRate ? (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '0.1rem' }}>
+                          {isSyp 
+                            ? `≈ $ ${(inv.totalAmount / inv.exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`
+                            : `≈ ${Math.round(inv.totalAmount * inv.exchangeRate).toLocaleString()} ل.س`
+                          }
+                        </div>
+                      ) : null}
                     </td>
                     <td style={{ textAlign: 'left', fontWeight: 700, color: remaining > 0 ? 'var(--danger-color)' : 'var(--success-color)' }}>
                       {remaining > 0 ? `${invSym} ${remaining.toLocaleString()}` : '0 ✓'}
@@ -476,34 +501,118 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                {/* Currency Selection for Invoice */}
-                <div style={{ marginBottom: '1.25rem', padding: '0.85rem 1.15rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <div>
-                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-dark)', display: 'block' }}>
-                      عملة الفاتورة (بيع / تسعير / تحصيل):
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      اختر العملة المحددة لهذه الفاتورة (دولار أمريكي أو ليرة سورية)
-                    </span>
+                {/* Currency Selection & Today's Exchange Rate */}
+                <div style={{ 
+                  marginBottom: '1.25rem', 
+                  padding: '1rem 1.15rem', 
+                  backgroundColor: '#f8fafc', 
+                  borderRadius: 'var(--radius-md)', 
+                  border: '1.5px solid var(--border-color)', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '0.85rem' 
+                }}>
+                  {/* Top row: Currency selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-dark)', display: 'block' }}>
+                        عملة الفاتورة (بيع / تسعير / تحصيل):
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        اختر العملة المحددة لهذه الفاتورة (دولار أمريكي أو ليرة سورية)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${invoiceCurrency === 'USD' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ padding: '0.45rem 1.1rem', fontWeight: 800, fontSize: '0.85rem' }}
+                        onClick={() => setInvoiceCurrency('USD')}
+                      >
+                        💵 دولار أمريكي ($)
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${invoiceCurrency === 'SYP' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ padding: '0.45rem 1.1rem', fontWeight: 800, fontSize: '0.85rem' }}
+                        onClick={() => setInvoiceCurrency('SYP')}
+                      >
+                        🇸🇾 ليرة سورية (ل.س)
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${invoiceCurrency === 'USD' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ padding: '0.45rem 1.1rem', fontWeight: 800, fontSize: '0.85rem' }}
-                      onClick={() => setInvoiceCurrency('USD')}
-                    >
-                      💵 دولار أمريكي ($)
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${invoiceCurrency === 'SYP' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ padding: '0.45rem 1.1rem', fontWeight: 800, fontSize: '0.85rem' }}
-                      onClick={() => setInvoiceCurrency('SYP')}
-                    >
-                      🇸🇾 ليرة سورية (ل.س)
-                    </button>
+
+                  {/* Second row: Exchange rate input field */}
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#fefce8',
+                    borderRadius: '8px',
+                    border: '1.5px solid #fde047',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div>
+                      <label style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+                        <span>💵 سعر صرف الدولار اليوم (مقابل الليرة السورية) *</span>
+                      </label>
+                      <span style={{ fontSize: '0.76rem', color: '#a16207' }}>
+                        أدخل قيمة الليرة السورية لـ 1 دولار اليوم لمعادلة الفاتورة بدقة
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <input 
+                        type="number" 
+                        step="any"
+                        className="form-input" 
+                        style={{ 
+                          width: '135px', 
+                          fontWeight: 800, 
+                          textAlign: 'center', 
+                          fontSize: '1rem', 
+                          backgroundColor: 'white',
+                          borderColor: '#fde047',
+                          color: '#854d0e'
+                        }}
+                        value={exchangeRate} 
+                        onChange={(e) => {
+                          setExchangeRate(e.target.value);
+                          localStorage.setItem('last_dollar_rate', e.target.value);
+                        }}
+                        placeholder="14800"
+                        required
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#854d0e' }}>ل.س / $</span>
+                    </div>
                   </div>
+
+                  {/* Live Conversion Preview */}
+                  {grandTotal > 0 && (
+                    <div style={{
+                      padding: '0.5rem 0.85rem',
+                      backgroundColor: 'white',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.85rem',
+                      fontWeight: 700
+                    }}>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {invoiceCurrency === 'USD' ? '🇸🇾 المعادل التقديري بالليرة السورية:' : '💵 المعادل التقديري بالدولار الأمريكي:'}
+                      </span>
+                      <span style={{ color: '#0369a1', fontSize: '0.95rem', fontWeight: 800 }}>
+                        {invoiceCurrency === 'USD' 
+                          ? `${Math.round(grandTotal * currentRateNum).toLocaleString()} ل.س`
+                          : `$ ${(currentRateNum > 0 ? grandTotal / currentRateNum : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        }
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Production Source Selector */}

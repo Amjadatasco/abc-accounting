@@ -51,6 +51,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     setExternalCost('');
     setExternalPaymentMethod('cash');
     setAutoRecordExpense(true);
+    setExchangeRate(localStorage.getItem('last_dollar_rate') || '14800');
     setSaleDate(new Date().toISOString().split('T')[0]);
     setIsModalOpen(true);
   };
@@ -60,6 +61,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     setSaleType(sale.saleType || (sale.productionSource === 'external' ? 'external' : 'service'));
     setProductionSource(sale.productionSource || 'uv');
     setCurrency(sale.currency || 'USD');
+    setExchangeRate(sale.exchangeRate ? String(sale.exchangeRate) : (localStorage.getItem('last_dollar_rate') || '14800'));
     setCustomerName(sale.customerName || '');
     setSaleDate(sale.date || new Date().toISOString().split('T')[0]);
 
@@ -112,8 +114,11 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+  const [exchangeRate, setExchangeRate] = useState<string>(() => localStorage.getItem('last_dollar_rate') || '14800');
 
   const currSym = currency === 'SYP' ? 'ل.س' : '$';
+  const currentRateNum = parseFloat(exchangeRate) || 14800;
+  const currentTotalNum = parseFloat(totalAmountInput) || ((parseFloat(quantity) || 1) * (parseFloat(unitPrice) || 0));
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
 
@@ -290,6 +295,10 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     }
 
     const invoiceNumber = editingSale ? editingSale.invoiceNumber : `INV-${Date.now().toString().slice(-6)}`;
+    const finalRate = parseFloat(exchangeRate) || 14800;
+    const finalEquivalent = currency === 'USD'
+      ? totalAmount * finalRate
+      : finalRate > 0 ? totalAmount / finalRate : 0;
 
     const newSaleData: Omit<Invoice, 'id' | 'createdAt'> = {
       invoiceNumber,
@@ -314,6 +323,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       totalAmount,
       currency,
       currencySymbol: currSym,
+      exchangeRate: finalRate,
+      equivalentAmount: Math.round(finalEquivalent * 100) / 100,
       saleType,
       productionSource: isExternal ? 'external' : productionSource,
       paymentMethod,
@@ -372,8 +383,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
           taxAmount: 0,
           currency,
           currencySymbol: currSym,
-          exchangeRate: 14800,
-          equivalentAmount: currency === 'USD' ? extCostNum * 14800 : extCostNum / 14800,
+          exchangeRate: finalRate,
+          equivalentAmount: currency === 'USD' ? extCostNum * finalRate : finalRate > 0 ? extCostNum / finalRate : 0,
           paymentMethod: externalPaymentMethod,
           paidBy: 'abc',
           status: externalPaymentMethod === 'credit' ? 'unpaid' : 'paid',
@@ -962,9 +973,22 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                         <span className="badge" style={{ backgroundColor: isSyp ? '#f0fdf4' : '#eff6ff', color: isSyp ? '#166534' : '#1e40af', border: `1px solid ${isSyp ? '#bbf7d0' : '#bfdbfe'}`, fontSize: '0.75rem', fontWeight: 700 }}>
                           {isSyp ? '🇸🇾 سوري' : '💵 دولار'}
                         </span>
+                        {sale.exchangeRate ? (
+                          <div style={{ fontSize: '0.67rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                            1$ = {Number(sale.exchangeRate).toLocaleString()} ل.س
+                          </div>
+                        ) : null}
                       </td>
                       <td style={{ textAlign: 'left', fontWeight: 800 }}>
                         <div>{saleSym} {sale.totalAmount.toLocaleString()}</div>
+                        {sale.exchangeRate ? (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, marginTop: '0.1rem' }}>
+                            {isSyp 
+                              ? `≈ $ ${(sale.totalAmount / sale.exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}`
+                              : `≈ ${Math.round(sale.totalAmount * sale.exchangeRate).toLocaleString()} ل.س`
+                            }
+                          </div>
+                        ) : null}
                         {sale.externalCost && sale.externalCost > 0 ? (
                           <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 800, marginTop: '0.15rem' }}>
                             ربح: {saleSym} {(sale.totalAmount - sale.externalCost).toLocaleString()}
@@ -1060,34 +1084,118 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
             <form onSubmit={(e) => handleSubmit(e, false)}>
               <div className="modal-body">
                 
-                {/* 1. Currency Selection Bar */}
-                <div style={{ marginBottom: '1.25rem', padding: '0.85rem 1.15rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <div>
-                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-dark)', display: 'block' }}>
-                      عملة البيع والتحصيل:
-                    </span>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      حدد عملة تسعير هذه العملية
-                    </span>
+                {/* 1. Currency & Today's Exchange Rate */}
+                <div style={{ 
+                  marginBottom: '1.25rem', 
+                  padding: '1rem 1.15rem', 
+                  backgroundColor: '#f8fafc', 
+                  borderRadius: 'var(--radius-md)', 
+                  border: '1.5px solid var(--border-color)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.85rem'
+                }}>
+                  {/* Top row: Currency selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-dark)', display: 'block' }}>
+                        عملة البيع والتحصيل:
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        حدد عملة تسعير هذه العملية (دولار أمريكي أو ليرة سورية)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${currency === 'USD' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ padding: '0.5rem 1.25rem', fontWeight: 800, fontSize: '0.9rem' }}
+                        onClick={() => setCurrency('USD')}
+                      >
+                        💵 دولار أمريكي ($)
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${currency === 'SYP' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ padding: '0.5rem 1.25rem', fontWeight: 800, fontSize: '0.9rem' }}
+                        onClick={() => setCurrency('SYP')}
+                      >
+                        🇸🇾 ليرة سورية (ل.س)
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${currency === 'USD' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ padding: '0.5rem 1.25rem', fontWeight: 800, fontSize: '0.9rem' }}
-                      onClick={() => setCurrency('USD')}
-                    >
-                      💵 دولار أمريكي ($)
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${currency === 'SYP' ? 'btn-primary' : 'btn-outline'}`}
-                      style={{ padding: '0.5rem 1.25rem', fontWeight: 800, fontSize: '0.9rem' }}
-                      onClick={() => setCurrency('SYP')}
-                    >
-                      🇸🇾 ليرة سورية (ل.س)
-                    </button>
+
+                  {/* Second row: Exchange rate input field */}
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#fefce8',
+                    borderRadius: '8px',
+                    border: '1.5px solid #fde047',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div>
+                      <label style={{ fontWeight: 800, fontSize: '0.9rem', color: '#854d0e', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+                        <span>💵 سعر صرف الدولار اليوم (مقابل الليرة السورية) *</span>
+                      </label>
+                      <span style={{ fontSize: '0.76rem', color: '#a16207' }}>
+                        أدخل قيمة الليرة السورية لـ 1 دولار اليوم لمعادلة المبالغ وحفظها بدقة
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <input 
+                        type="number" 
+                        step="any"
+                        className="form-input" 
+                        style={{ 
+                          width: '135px', 
+                          fontWeight: 800, 
+                          textAlign: 'center', 
+                          fontSize: '1rem', 
+                          backgroundColor: 'white',
+                          borderColor: '#fde047',
+                          color: '#854d0e'
+                        }}
+                        value={exchangeRate} 
+                        onChange={(e) => {
+                          setExchangeRate(e.target.value);
+                          localStorage.setItem('last_dollar_rate', e.target.value);
+                        }}
+                        placeholder="14800"
+                        required
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#854d0e' }}>ل.س / $</span>
+                    </div>
                   </div>
+
+                  {/* Live Conversion Preview */}
+                  {currentTotalNum > 0 && (
+                    <div style={{
+                      padding: '0.5rem 0.85rem',
+                      backgroundColor: 'white',
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '0.85rem',
+                      fontWeight: 700
+                    }}>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {currency === 'USD' ? '🇸🇾 المعادل التقديري بالليرة السورية:' : '💵 المعادل التقديري بالدولار الأمريكي:'}
+                      </span>
+                      <span style={{ color: '#0369a1', fontSize: '0.95rem', fontWeight: 800 }}>
+                        {currency === 'USD' 
+                          ? `${Math.round(currentTotalNum * currentRateNum).toLocaleString()} ل.س`
+                          : `$ ${(currentRateNum > 0 ? currentTotalNum / currentRateNum : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        }
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Sale Type Toggle */}

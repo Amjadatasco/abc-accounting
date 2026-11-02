@@ -33,7 +33,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const getInvUSD = (inv: Invoice) => {
     if ((inv.currency || 'USD') === 'USD') return Number(inv.totalAmount) || 0;
-    return todayRate > 0 ? (Number(inv.totalAmount) || 0) / todayRate : 0;
+    const rate = inv.exchangeRate || todayRate;
+    return rate > 0 ? (Number(inv.totalAmount) || 0) / rate : 0;
   };
 
   // Unified expenses in USD (converting SYP at transaction rate e.g. 130 or 14800)

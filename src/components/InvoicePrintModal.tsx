@@ -378,6 +378,25 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({ invoice, o
                 <span style={{ color: 'var(--primary-color)' }}>{curr} {invoice.totalAmount.toLocaleString()}</span>
               </div>
 
+              {invoice.exchangeRate ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', fontSize: '0.82rem', color: '#64748b', borderBottom: '1px dashed var(--border-color)', marginBottom: '0.3rem' }}>
+                  <span>سعر صرف اليوم:</span>
+                  <span>1$ = {Number(invoice.exchangeRate).toLocaleString()} ل.س</span>
+                </div>
+              ) : null}
+
+              {invoice.exchangeRate ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.3rem 0', fontSize: '0.85rem', color: '#0369a1', fontWeight: 800, borderBottom: '1px dashed var(--border-color)', marginBottom: '0.4rem' }}>
+                  <span>{invoice.currency === 'SYP' ? 'المعادل بالدولار:' : 'المعادل بالليرة السورية:'}</span>
+                  <span>
+                    {invoice.currency === 'SYP'
+                      ? `$ ${(invoice.totalAmount / invoice.exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : `${Math.round(invoice.totalAmount * invoice.exchangeRate).toLocaleString()} ل.س`
+                    }
+                  </span>
+                </div>
+              ) : null}
+
               {invoice.paidAmount > 0 && remaining > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', fontSize: '0.88rem', color: 'var(--success-color)', fontWeight: 700 }}>
                   <span>المسدد:</span>
