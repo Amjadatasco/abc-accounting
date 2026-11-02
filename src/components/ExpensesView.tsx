@@ -14,6 +14,7 @@ export const ExpensesView: React.FC = () => {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [filterAccountId, setFilterAccountId] = useState<string>('all');
+  const [filterOnlyNotes, setFilterOnlyNotes] = useState(false);
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
 
   // Form
@@ -165,9 +166,10 @@ export const ExpensesView: React.FC = () => {
     const term = searchTerm.trim().toLowerCase();
     const matchesAccount = filterAccountId === 'all' || exp.accountId === filterAccountId;
     const matchesDate = (!filterStartDate || exp.date >= filterStartDate) && (!filterEndDate || exp.date <= filterEndDate);
+    const matchesNotes = !filterOnlyNotes || Boolean(exp.notes && exp.notes.trim());
 
     if (!term) {
-      return matchesDate && matchesAccount;
+      return matchesDate && matchesAccount && matchesNotes;
     }
 
     const matchesText = exp.billNumber.toLowerCase().includes(term) ||
@@ -179,7 +181,7 @@ export const ExpensesView: React.FC = () => {
       (exp.equivalentAmount && String(Math.round(exp.equivalentAmount)).includes(term));
 
     const matchesSearch = matchesText || matchesAmount;
-    return matchesSearch && matchesDate && matchesAccount;
+    return matchesSearch && matchesDate && matchesAccount && matchesNotes;
   });
 
   // Per-payer groupings
@@ -860,15 +862,34 @@ export const ExpensesView: React.FC = () => {
               value={filterEndDate} 
               onChange={(e) => setFilterEndDate(e.target.value)} 
             />
-            {(filterStartDate || filterEndDate) && (
+            {(filterStartDate || filterEndDate || filterOnlyNotes) && (
               <button 
                 className="btn btn-sm btn-outline" 
                 style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} 
-                onClick={() => { setFilterStartDate(''); setFilterEndDate(''); }}
+                onClick={() => { setFilterStartDate(''); setFilterEndDate(''); setFilterOnlyNotes(false); }}
               >
                 ✕ مسح
               </button>
             )}
+
+            {/* Notes Quick Filter Toggle */}
+            <button
+              type="button"
+              className={`btn btn-sm ${filterOnlyNotes ? 'btn-primary' : 'btn-outline'}`}
+              style={{ 
+                padding: '0.3rem 0.65rem', 
+                fontSize: '0.78rem', 
+                fontWeight: 700, 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '0.3rem' 
+              }}
+              onClick={() => setFilterOnlyNotes(prev => !prev)}
+              title="تصفية وعرض السندات التي تحتوي على ملاحظات فقط"
+            >
+              <span>📝</span>
+              <span>سندات بملاحظات ({expenses.filter(e => e.notes && e.notes.trim()).length})</span>
+            </button>
           </div>
 
           {/* Sorting & Search Controls */}
@@ -1039,10 +1060,60 @@ export const ExpensesView: React.FC = () => {
 
                   return (
                     <tr key={exp.id}>
-                      <td style={{ fontWeight: 800, color: 'var(--primary-color)' }}>{exp.billNumber}</td>
+                      <td style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span>{exp.billNumber}</span>
+                          {exp.notes && exp.notes.trim() ? (
+                            <span 
+                              className="badge" 
+                              title={`ملاحظات السند:\n${exp.notes}`}
+                              style={{ 
+                                backgroundColor: '#fef3c7', 
+                                color: '#92400e', 
+                                border: '1px solid #fde68a', 
+                                fontSize: '0.7rem', 
+                                padding: '0.12rem 0.4rem', 
+                                fontWeight: 800,
+                                cursor: 'help',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.2rem'
+                              }}
+                            >
+                              <span>📝</span>
+                              <span>يوجد ملاحظات</span>
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td style={{ fontSize: '0.85rem' }}>{exp.date}</td>
                       <td>{getPayerBadge(exp.paidBy)}</td>
-                      <td style={{ fontWeight: 600 }}>{exp.vendorName}</td>
+                      <td style={{ fontWeight: 600 }}>
+                        <div>{exp.vendorName}</div>
+                        {exp.notes && exp.notes.trim() ? (
+                          <div 
+                            style={{ 
+                              fontSize: '0.75rem', 
+                              color: '#78350f', 
+                              backgroundColor: '#fffbeb', 
+                              border: '1px solid #fde68a', 
+                              borderRadius: '5px', 
+                              padding: '0.25rem 0.5rem', 
+                              marginTop: '0.3rem',
+                              display: 'inline-flex',
+                              alignItems: 'flex-start',
+                              gap: '0.35rem',
+                              maxWidth: '280px',
+                              lineHeight: 1.4,
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                            }}
+                            title={`ملاحظات السند: ${exp.notes}`}
+                          >
+                            <span style={{ fontSize: '0.82rem', flexShrink: 0, marginTop: '1px' }}>📝</span>
+                            <span style={{ fontWeight: 600, wordBreak: 'break-word' }}>{exp.notes}</span>
+                          </div>
+                        ) : null}
+                      </td>
                       <td>
                         <span className="badge badge-gray">{acc ? acc.name : 'مصروف تشغيلي'}</span>
                       </td>
