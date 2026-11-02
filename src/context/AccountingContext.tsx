@@ -58,6 +58,7 @@ interface AccountingContextType {
   deleteAccount: (id: string) => boolean;
   addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => { success: boolean; error?: string };
   addInvoice: (invoice: Omit<Invoice, 'id' | 'createdAt'>) => void;
+  updateInvoice: (invoice: Invoice) => void;
   markInvoicePaid: (id: string, accountId?: string) => void;
   deleteInvoice: (id: string) => void;
   addExpense: (expense: Omit<ExpenseBill, 'id' | 'createdAt'>) => void;
@@ -996,6 +997,146 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  // Update Invoice
+  const updateInvoice = (updatedInvoice: Invoice) => {
+    const oldInv = invoices.find(i => i.id === updatedInvoice.id);
+    if (!oldInv) return;
+
+    // 1. Update Invoices State
+    setInvoices(prev => prev.map(inv => inv.id === updatedInvoice.id ? updatedInvoice : inv));
+
+    // 2. Sync to Cloud
+    syncRowToCloud('accounting_invoices', {
+      id: updatedInvoice.id,
+      invoice_number: updatedInvoice.invoiceNumber,
+      customer_id: updatedInvoice.customerId,
+      customer_name: updatedInvoice.customerName,
+      date: updatedInvoice.date,
+      due_date: updatedInvoice.dueDate,
+      currency: updatedInvoice.currency || 'USD',
+      currency_symbol: updatedInvoice.currencySymbol || '$',
+      total_amount: updatedInvoice.totalAmount,
+      paid_amount: updatedInvoice.paidAmount,
+      status: updatedInvoice.status,
+      sale_type: updatedInvoice.saleType || 'service',
+      payment_method: updatedInvoice.paymentMethod || 'cash',
+      data: updatedInvoice,
+      updated_at: new Date().toISOString(),
+    });
+
+    // 3. Stock adjustments
+    oldInv.items.forEach(item => {
+      if (item.productId && item.quantity > 0) {
+        adjustProductStock(item.productId, item.quantity, `إلغاء خصم لتعديل فاتورة ${oldInv.invoiceNumber}`);
+      }
+    });
+    updatedInvoice.items.forEach(item => {
+      if (item.productId && item.quantity > 0) {
+        adjustProductStock(item.productId, -item.quantity, `خصم مبيعات معدلة ${updatedInvoice.invoiceNumber}`);
+      }
+    });
+
+    // 4. Contact balance adjustments
+    const oldRemaining = Math.max(0, oldInv.totalAmount - oldInv.paidAmount);
+    const newRemaining = Math.max(0, updatedInvoice.totalAmount - updatedInvoice.paidAmount);
+
+    if (oldInv.customerId === updatedInvoice.customerId) {
+      const diff = newRemaining - oldRemaining;
+      if (diff !== 0 && updatedInvoice.customerId) {
+        setContacts(prev => prev.map(c => 
+          c.id === updatedInvoice.customerId ? { ...c, balance: c.balance + diff } : c
+        ));
+      }
+    } else {
+      setContacts(prev => prev.map(c => {
+        if (c.id === oldInv.customerId) {
+          return { ...c, balance: c.balance - oldRemaining };
+        }
+        if (c.id === updatedInvoice.customerId) {
+          return { ...c, balance: c.balance + newRemaining };
+        }
+        return c;
+      }));
+    }
+
+    // 5. Update Journal Entry if exists
+    const jeIndex = journalEntries.findIndex(j => 
+      j.reference === updatedInvoice.invoiceNumber || 
+      j.entryNumber === `JE-INV-${updatedInvoice.invoiceNumber}`
+    );
+
+    const salesAcc = accounts.find(a => a.code === '4100') || accounts.find(a => a.category === 'revenue');
+    const paymentAcc = updatedInvoice.paymentMethod === 'sham_cash'
+      ? (accounts.find(a => a.code === '1125') || accounts.find(a => a.name.includes('شام كاش')) || accounts.find(a => a.code === '1110'))
+      : updatedInvoice.paymentMethod === 'bank'
+      ? (accounts.find(a => a.code === '1120') || accounts.find(a => a.code === '1110'))
+      : (accounts.find(a => a.code === '1110') || accounts.find(a => a.code === '1120'));
+    const arAcc = accounts.find(a => a.code === '1130');
+
+    if (jeIndex !== -1 && salesAcc) {
+      const existingJE = journalEntries[jeIndex];
+      const lines = [];
+
+      if (updatedInvoice.paidAmount > 0 && paymentAcc) {
+        const methodLabel = updatedInvoice.paymentMethod === 'sham_cash' ? 'محفظة شام كاش' : updatedInvoice.paymentMethod === 'bank' ? 'حساب بنكي' : 'نقدي (خزينة)';
+        lines.push({
+          accountId: paymentAcc.id,
+          accountCode: paymentAcc.code,
+          accountName: paymentAcc.name,
+          description: `تحصيل ${methodLabel} - مبيعات ${updatedInvoice.invoiceNumber}`,
+          debit: updatedInvoice.paidAmount,
+          credit: 0
+        });
+      }
+
+      if (newRemaining > 0 && arAcc) {
+        lines.push({
+          accountId: arAcc.id,
+          accountCode: arAcc.code,
+          accountName: arAcc.name,
+          description: `مستحق عملاء - فاتورة ${updatedInvoice.invoiceNumber}`,
+          debit: newRemaining,
+          credit: 0
+        });
+      }
+
+      lines.push({
+        accountId: salesAcc.id,
+        accountCode: salesAcc.code,
+        accountName: salesAcc.name,
+        description: `إيراد مبيعات فاتورة ${updatedInvoice.invoiceNumber}`,
+        debit: 0,
+        credit: updatedInvoice.totalAmount
+      });
+
+      if (lines.length >= 2) {
+        const updatedJE: JournalEntry = {
+          ...existingJE,
+          date: updatedInvoice.date,
+          reference: updatedInvoice.invoiceNumber,
+          notes: `إثبات مبيعات الفاتورة ${updatedInvoice.invoiceNumber} للعميل ${updatedInvoice.customerName} (${updatedInvoice.currencySymbol || '$'})`,
+          currency: updatedInvoice.currency || 'USD',
+          currencySymbol: updatedInvoice.currencySymbol || '$',
+          lines
+        };
+        setJournalEntries(prev => prev.map((j, idx) => idx === jeIndex ? updatedJE : j));
+        syncRowToCloud('accounting_journal', {
+          id: updatedJE.id,
+          entry_number: updatedJE.entryNumber,
+          date: updatedJE.date,
+          reference: updatedJE.reference,
+          notes: updatedJE.notes,
+          currency: updatedJE.currency || 'USD',
+          currency_symbol: updatedJE.currencySymbol || '$',
+          total_debit: updatedJE.lines.reduce((s, l) => s + (l.debit || 0), 0),
+          total_credit: updatedJE.lines.reduce((s, l) => s + (l.credit || 0), 0),
+          data: updatedJE,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+  };
+
   const markInvoicePaid = (id: string, depositAccountId?: string) => {
     setInvoices(prev => prev.map(inv => {
       if (inv.id !== id) return inv;
@@ -1508,6 +1649,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       deleteAccount,
       addJournalEntry,
       addInvoice,
+      updateInvoice,
       markInvoicePaid,
       deleteInvoice,
       addExpense,

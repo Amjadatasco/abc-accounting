@@ -11,9 +11,10 @@ interface SalesViewProps {
 }
 
 export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigger }) => {
-  const { invoices, contacts, products, addInvoice, markInvoicePaid, deleteInvoice, addContact, addExpense, accounts } = useAccounting();
+  const { invoices, contacts, products, addInvoice, updateInvoice, markInvoicePaid, deleteInvoice, addContact, addExpense, accounts } = useAccounting();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSale, setEditingSale] = useState<Invoice | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCurrency, setFilterCurrency] = useState<'all' | 'USD' | 'SYP'>('all');
   const [filterType, setFilterType] = useState<'all' | 'service' | 'product' | 'external'>('all');
@@ -31,6 +32,59 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   const [externalPaymentMethod, setExternalPaymentMethod] = useState<'cash' | 'bank' | 'sham_cash' | 'credit'>('cash');
   const [autoRecordExpense, setAutoRecordExpense] = useState(true);
 
+  const openNewSaleModal = (type: 'service' | 'product' | 'external', src: ProductionSource) => {
+    setEditingSale(null);
+    setSaleType(type);
+    setSelectedProductId('');
+    setProductionSource(src);
+    setCustomerName('');
+    setItemDescription('');
+    setQuantity('1');
+    setUnitPrice('');
+    setTotalAmountInput('');
+    setPaymentMethod('cash');
+    setPaymentStatus('paid');
+    setPartialAmount('');
+    setNotes('');
+    setInternalNotes('');
+    setExternalSupplier('');
+    setExternalCost('');
+    setExternalPaymentMethod('cash');
+    setAutoRecordExpense(true);
+    setSaleDate(new Date().toISOString().split('T')[0]);
+    setIsModalOpen(true);
+  };
+
+  const handleEditSale = (sale: Invoice) => {
+    setEditingSale(sale);
+    setSaleType(sale.saleType || (sale.productionSource === 'external' ? 'external' : 'service'));
+    setProductionSource(sale.productionSource || 'uv');
+    setCurrency(sale.currency || 'USD');
+    setCustomerName(sale.customerName || '');
+    setSaleDate(sale.date || new Date().toISOString().split('T')[0]);
+
+    const firstItem = sale.items && sale.items[0];
+    setItemDescription(firstItem ? firstItem.description : '');
+    setQuantity(firstItem ? String(firstItem.quantity) : '1');
+    setUnitPrice(firstItem ? String(firstItem.unitPrice) : '');
+    setSelectedProductId(firstItem?.productId || '');
+    setTotalAmountInput(String(sale.totalAmount || ''));
+
+    setPaymentMethod(sale.paymentMethod || 'cash');
+    setPaymentStatus(sale.status || 'paid');
+    setPartialAmount(sale.status === 'partial' ? String(sale.paidAmount) : '');
+
+    setNotes(sale.notes || '');
+    setInternalNotes(sale.internalNotes || '');
+
+    setExternalSupplier(sale.externalSupplierName || '');
+    setExternalCost(sale.externalCost ? String(sale.externalCost) : '');
+    setExternalPaymentMethod(sale.externalPaymentMethod || 'cash');
+    setAutoRecordExpense(false);
+
+    setIsModalOpen(true);
+  };
+
   React.useEffect(() => {
     if (initialSource) {
       setProductionSource(initialSource);
@@ -42,7 +96,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
 
   React.useEffect(() => {
     if (modalTrigger && modalTrigger > 0) {
-      setIsModalOpen(true);
+      openNewSaleModal(initialSource === 'external' ? 'external' : 'service', initialSource || 'uv');
     }
   }, [modalTrigger]);
   const [selectedProductId, setSelectedProductId] = useState<string>('');
@@ -235,7 +289,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       paidAmount = parseFloat(partialAmount) || 0;
     }
 
-    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+    const invoiceNumber = editingSale ? editingSale.invoiceNumber : `INV-${Date.now().toString().slice(-6)}`;
 
     const newSaleData: Omit<Invoice, 'id' | 'createdAt'> = {
       invoiceNumber,
@@ -245,7 +299,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       dueDate: saleDate,
       items: [
         {
-          id: `item_${Date.now()}`,
+          id: editingSale && editingSale.items && editingSale.items[0]?.id ? editingSale.items[0].id : `item_${Date.now()}`,
           productId: saleType === 'product' && selectedProductId ? selectedProductId : undefined,
           description: itemTrimmed,
           quantity: qtyNum,
@@ -273,55 +327,71 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       externalStatus: isExternal ? (externalPaymentMethod === 'credit' ? 'unpaid' : 'paid') : undefined
     };
 
-    addInvoice(newSaleData);
+    if (editingSale) {
+      const updatedSale: Invoice = {
+        ...editingSale,
+        ...newSaleData,
+        id: editingSale.id,
+        invoiceNumber: editingSale.invoiceNumber,
+        createdAt: editingSale.createdAt
+      };
+      updateInvoice(updatedSale);
 
-    // Auto-record expense bill for the external workshop if enabled
-    if (isExternal && autoRecordExpense && extCostNum > 0 && externalSupplier.trim()) {
-      const extVendTrimmed = externalSupplier.trim();
-      let vendorContact = contacts.find(c => c.name.trim().toLowerCase() === extVendTrimmed.toLowerCase());
-      if (!vendorContact) {
-        addContact({
-          name: extVendTrimmed,
-          type: 'vendor',
-          phone: 'غير مسجل',
-          balance: 0,
+      if (printImmediately) {
+        setPrintingInvoice(updatedSale);
+      }
+    } else {
+      addInvoice(newSaleData);
+
+      // Auto-record expense bill for the external workshop if enabled
+      if (isExternal && autoRecordExpense && extCostNum > 0 && externalSupplier.trim()) {
+        const extVendTrimmed = externalSupplier.trim();
+        let vendorContact = contacts.find(c => c.name.trim().toLowerCase() === extVendTrimmed.toLowerCase());
+        if (!vendorContact) {
+          addContact({
+            name: extVendTrimmed,
+            type: 'vendor',
+            phone: 'غير مسجل',
+            balance: 0,
+            currency,
+            currencySymbol: currSym
+          });
+        }
+
+        const outsourceAcc = accounts.find(a => a.id === 'acc_5150' || a.name.includes('خارجية')) || accounts.find(a => a.category === 'expense');
+        const accId = outsourceAcc ? outsourceAcc.id : 'acc_5150';
+        const billNumber = `EXP-OUT-${Date.now().toString().slice(-6)}`;
+
+        addExpense({
+          billNumber,
+          vendorId: vendorContact?.id,
+          vendorName: extVendTrimmed,
+          accountId: accId,
+          date: saleDate,
+          amount: extCostNum,
+          taxAmount: 0,
           currency,
-          currencySymbol: currSym
+          currencySymbol: currSym,
+          exchangeRate: 14800,
+          equivalentAmount: currency === 'USD' ? extCostNum * 14800 : extCostNum / 14800,
+          paymentMethod: externalPaymentMethod,
+          paidBy: 'abc',
+          status: externalPaymentMethod === 'credit' ? 'unpaid' : 'paid',
+          notes: `تكلفة تنفيذ خارجي للفاتورة ${invoiceNumber} (${itemTrimmed}) لدى ${extVendTrimmed}`
         });
       }
 
-      const outsourceAcc = accounts.find(a => a.id === 'acc_5150' || a.name.includes('خارجية')) || accounts.find(a => a.category === 'expense');
-      const accId = outsourceAcc ? outsourceAcc.id : 'acc_5150';
-      const billNumber = `EXP-OUT-${Date.now().toString().slice(-6)}`;
-
-      addExpense({
-        billNumber,
-        vendorId: vendorContact?.id,
-        vendorName: extVendTrimmed,
-        accountId: accId,
-        date: saleDate,
-        amount: extCostNum,
-        taxAmount: 0,
-        currency,
-        currencySymbol: currSym,
-        exchangeRate: 14800,
-        equivalentAmount: currency === 'USD' ? extCostNum * 14800 : extCostNum / 14800,
-        paymentMethod: externalPaymentMethod,
-        paidBy: 'abc',
-        status: externalPaymentMethod === 'credit' ? 'unpaid' : 'paid',
-        notes: `تكلفة تنفيذ خارجي للفاتورة ${invoiceNumber} (${itemTrimmed}) لدى ${extVendTrimmed}`
-      });
-    }
-
-    if (printImmediately) {
-      setPrintingInvoice({
-        ...newSaleData,
-        id: `inv_${Date.now()}`,
-        createdAt: new Date().toISOString()
-      });
+      if (printImmediately) {
+        setPrintingInvoice({
+          ...newSaleData,
+          id: `inv_${Date.now()}`,
+          createdAt: new Date().toISOString()
+        });
+      }
     }
 
     // Reset Form
+    setEditingSale(null);
     setCustomerName('');
     setItemDescription('');
     setSelectedProductId('');
@@ -395,12 +465,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
         <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button 
             className="btn" 
-            onClick={() => { 
-              setSaleType('external'); 
-              setSelectedProductId(''); 
-              setProductionSource('external'); 
-              setIsModalOpen(true); 
-            }}
+            onClick={() => openNewSaleModal('external', 'external')}
             style={{ 
               padding: '0.65rem 1.15rem', 
               fontSize: '0.9rem', 
@@ -415,14 +480,14 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
           </button>
           <button 
             className="btn btn-primary" 
-            onClick={() => { setSaleType('product'); setSelectedProductId(''); setProductionSource('general'); setIsModalOpen(true); }}
+            onClick={() => openNewSaleModal('product', 'general')}
             style={{ padding: '0.65rem 1.15rem', fontSize: '0.9rem', fontWeight: 800, backgroundColor: '#059669', borderColor: '#059669' }}
           >
             <span>📦</span> بيع بضاعة من المخزن
           </button>
           <button 
             className="btn btn-outline" 
-            onClick={() => { setSaleType('service'); setSelectedProductId(''); setProductionSource('uv'); setIsModalOpen(true); }}
+            onClick={() => openNewSaleModal('service', 'uv')}
             style={{ padding: '0.65rem 1.15rem', fontSize: '0.9rem', fontWeight: 800 }}
           >
             <span>🛠️</span> بيع خدمة أو طباعة
@@ -819,7 +884,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                 <th style={{ textAlign: 'center', width: '90px' }}>العملة</th>
                 <th style={{ textAlign: 'left', width: '125px' }}>المبلغ الإجمالي</th>
                 <th style={{ textAlign: 'center', width: '105px' }}>حالة السداد</th>
-                <th style={{ textAlign: 'center', width: '130px' }}>إجراءات</th>
+                <th style={{ textAlign: 'center', width: '190px' }}>إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -912,10 +977,26 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                         </span>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                          <button 
+                            className="btn btn-sm btn-outline" 
+                            title="تعديل عملية البيع"
+                            style={{ 
+                              padding: '0.22rem 0.55rem', 
+                              fontSize: '0.76rem', 
+                              fontWeight: 800, 
+                              color: '#1d4ed8', 
+                              borderColor: '#bfdbfe', 
+                              backgroundColor: '#eff6ff' 
+                            }}
+                            onClick={() => handleEditSale(sale)}
+                          >
+                            ✏️ تعديل
+                          </button>
                           <button 
                             className="btn btn-sm btn-outline" 
                             title="طباعة إيصال / فاتورة"
+                            style={{ padding: '0.22rem 0.45rem' }}
                             onClick={() => setPrintingInvoice(sale)}
                           >
                             🖨️
@@ -924,7 +1005,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                             <button 
                               className="btn btn-sm btn-primary" 
                               title="تسجيل سداد وتحصيل"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }}
+                              style={{ padding: '0.22rem 0.5rem', fontSize: '0.75rem' }}
                               onClick={() => {
                                 if (confirm(`هل تريد تأكيد سداد المبلغ المتبقي (${saleSym} ${remaining.toLocaleString()}) للعميل ${sale.customerName}؟`)) {
                                   markInvoicePaid(sale.id);
@@ -936,7 +1017,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                           )}
                           <button 
                             className="btn btn-sm btn-outline" 
-                            style={{ color: 'var(--danger-color)', borderColor: '#fecaca', padding: '0.2rem 0.45rem' }}
+                            style={{ color: 'var(--danger-color)', borderColor: '#fecaca', padding: '0.22rem 0.45rem' }}
                             title="حذف"
                             onClick={() => {
                               if (confirm(`هل أنت متأكد من حذف عملية البيع ${sale.invoiceNumber}؟`)) {
@@ -963,13 +1044,17 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
           <div className="modal-content modal-lg" style={{ maxWidth: '780px' }}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1.4rem' }}>🛒</span>
+                <span style={{ fontSize: '1.4rem' }}>{editingSale ? '✏️' : '🛒'}</span>
                 <div>
-                  <h3 style={{ margin: 0 }}>تسجيل عملية بيع جديدة (خدمة، تنفيذ خارجي، أو منتج)</h3>
-                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>إدخال سريع وسلس مع الحفظ الفوري للعميل والحسابات</p>
+                  <h3 style={{ margin: 0 }}>
+                    {editingSale ? `تعديل عملية البيع (${editingSale.invoiceNumber})` : 'تسجيل عملية بيع جديدة (خدمة، تنفيذ خارجي، أو منتج)'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {editingSale ? 'تعديل البيانات والأسعار وطريقة السداد مع تحديث الحسابات تلقائياً' : 'إدخال سريع وسلس مع الحفظ الفوري للعميل والحسابات'}
+                  </p>
                 </div>
               </div>
-              <button className="modal-close" onClick={() => setIsModalOpen(false)}>×</button>
+              <button className="modal-close" onClick={() => { setIsModalOpen(false); setEditingSale(null); }}>×</button>
             </div>
 
             <form onSubmit={(e) => handleSubmit(e, false)}>
@@ -1537,7 +1622,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
               </div>
 
               <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
-                <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)}>
+                <button type="button" className="btn btn-outline" onClick={() => { setIsModalOpen(false); setEditingSale(null); }}>
                   إلغاء
                 </button>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1547,10 +1632,10 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                     onClick={(e) => handleSubmit(e, true)}
                     style={{ fontWeight: 700 }}
                   >
-                    🖨️ حفظ وطباعة الفاتورة
+                    🖨️ {editingSale ? 'حفظ وطباعة التعديلات' : 'حفظ وطباعة الفاتورة'}
                   </button>
                   <button type="submit" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem', fontWeight: 800 }}>
-                    💾 حفظ عملية البيع فورا
+                    {editingSale ? '💾 حفظ التعديلات' : '💾 حفظ عملية البيع فورا'}
                   </button>
                 </div>
               </div>

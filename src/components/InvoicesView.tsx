@@ -15,9 +15,10 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
   onCloseModal: externalCloseModal,
   onOpenModal: externalOpenModal
 }) => {
-  const { invoices, contacts, addInvoice, markInvoicePaid, deleteInvoice, addContact } = useAccounting();
+  const { invoices, contacts, addInvoice, updateInvoice, markInvoicePaid, deleteInvoice, addContact } = useAccounting();
 
   const [internalModalOpen, setInternalModalOpen] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const isModalOpen = externalModalOpen !== undefined ? externalModalOpen : internalModalOpen;
   const setModalOpen = (open: boolean) => {
     if (externalCloseModal && !open) externalCloseModal();
@@ -93,6 +94,46 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
   }, 0);
   const grandTotal = subtotal + totalTax;
 
+  const openNewInvoiceModal = () => {
+    setEditingInvoice(null);
+    setInvoiceCurrency('USD');
+    setInvoiceSource('uv');
+    setCustomerNameInput('');
+    setDate(new Date().toISOString().split('T')[0]);
+    setDueDate(new Date().toISOString().split('T')[0]);
+    setItems([{ description: '', quantity: 1, unitPrice: 0, taxRate: 0, total: 0 }]);
+    setNotes('');
+    setInternalNotes('');
+    setInitialPaid('0');
+    setModalOpen(true);
+  };
+
+  const handleEditInvoice = (inv: Invoice) => {
+    setEditingInvoice(inv);
+    setInvoiceCurrency(inv.currency || 'USD');
+    setInvoiceSource(inv.productionSource || 'uv');
+    setCustomerNameInput(inv.customerName || '');
+    setDate(inv.date || new Date().toISOString().split('T')[0]);
+    setDueDate(inv.dueDate || inv.date || new Date().toISOString().split('T')[0]);
+    setItems(
+      inv.items && inv.items.length > 0
+        ? inv.items.map(it => ({
+            description: it.description,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            taxRate: it.taxRate || 0,
+            total: it.total,
+            productId: it.productId,
+            productionSource: it.productionSource
+          }))
+        : [{ description: '', quantity: 1, unitPrice: 0, taxRate: 0, total: 0 }]
+    );
+    setNotes(inv.notes || '');
+    setInternalNotes(inv.internalNotes || '');
+    setInitialPaid(String(inv.paidAmount || 0));
+    setModalOpen(true);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const nameTrimmed = customerNameInput.trim();
@@ -114,30 +155,52 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
       });
     }
 
-    const invoiceNumber = `INV-2026-${String(invoices.length + 1).padStart(3, '0')}`;
     const paid = parseFloat(initialPaid) || 0;
     const status = paid >= grandTotal ? 'paid' : (paid > 0 ? 'partial' : 'unpaid');
 
-    addInvoice({
-      invoiceNumber,
-      customerId: finalCustomerId,
-      customerName: nameTrimmed,
-      date,
-      dueDate,
-      items: items.map((it, idx) => ({ ...it, id: `item_${idx}_${Date.now()}`, productionSource: invoiceSource })),
-      subtotal,
-      taxAmount: totalTax,
-      totalAmount: grandTotal,
-      currency: invoiceCurrency,
-      currencySymbol: formCurrSym,
-      productionSource: invoiceSource,
-      status,
-      paidAmount: paid,
-      notes: notes.trim(),
-      internalNotes: internalNotes.trim()
-    });
+    if (editingInvoice) {
+      updateInvoice({
+        ...editingInvoice,
+        customerName: nameTrimmed,
+        customerId: finalCustomerId,
+        date,
+        dueDate,
+        items: items.map((it, idx) => ({ ...it, id: (it as any).id || `item_${idx}_${Date.now()}`, productionSource: invoiceSource })),
+        subtotal,
+        taxAmount: totalTax,
+        totalAmount: grandTotal,
+        currency: invoiceCurrency,
+        currencySymbol: formCurrSym,
+        productionSource: invoiceSource,
+        status,
+        paidAmount: paid,
+        notes: notes.trim(),
+        internalNotes: internalNotes.trim()
+      });
+    } else {
+      const invoiceNumber = `INV-2026-${String(invoices.length + 1).padStart(3, '0')}`;
+      addInvoice({
+        invoiceNumber,
+        customerId: finalCustomerId,
+        customerName: nameTrimmed,
+        date,
+        dueDate,
+        items: items.map((it, idx) => ({ ...it, id: `item_${idx}_${Date.now()}`, productionSource: invoiceSource })),
+        subtotal,
+        taxAmount: totalTax,
+        totalAmount: grandTotal,
+        currency: invoiceCurrency,
+        currencySymbol: formCurrSym,
+        productionSource: invoiceSource,
+        status,
+        paidAmount: paid,
+        notes: notes.trim(),
+        internalNotes: internalNotes.trim()
+      });
+    }
 
     // Reset
+    setEditingInvoice(null);
     setInvoiceCurrency('USD');
     setInvoiceSource('uv');
     setCustomerNameInput('');
@@ -165,7 +228,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
           <p>إنشاء ومتابعة الفواتير الضريبية وتحصيل المستحقات من العملاء</p>
         </div>
         <div className="header-actions">
-          <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
+          <button className="btn btn-primary" onClick={openNewInvoiceModal}>
             <span>+</span> إنشاء فاتورة مبيعات جديدة
           </button>
         </div>
@@ -342,10 +405,19 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                       </span>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                        <button 
+                          className="btn btn-sm btn-outline" 
+                          title="تعديل بيانات الفاتورة"
+                          style={{ padding: '0.22rem 0.55rem', fontSize: '0.76rem', fontWeight: 800, color: '#1d4ed8', borderColor: '#bfdbfe', backgroundColor: '#eff6ff' }}
+                          onClick={() => handleEditInvoice(inv)}
+                        >
+                          ✏️ تعديل
+                        </button>
                         <button 
                           className="btn btn-sm btn-outline" 
                           title="معاينة وطباعة الفاتورة"
+                          style={{ padding: '0.22rem 0.5rem', fontSize: '0.78rem' }}
                           onClick={() => setPrintingInvoice(inv)}
                         >
                           🖨️ طباعة
@@ -354,6 +426,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                           <button 
                             className="btn btn-sm btn-primary" 
                             title="تسجيل سداد الفاتورة"
+                            style={{ padding: '0.22rem 0.5rem', fontSize: '0.75rem' }}
                             onClick={() => {
                               if (confirm(`هل تريد تأكيد سداد المبلغ المتبقي (${invSym} ${remaining.toLocaleString()}) للفاتورة ${inv.invoiceNumber}؟`)) {
                                 markInvoicePaid(inv.id);
@@ -365,7 +438,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                         )}
                         <button 
                           className="btn btn-sm btn-outline" 
-                          style={{ color: 'var(--danger-color)', borderColor: '#fecaca' }}
+                          style={{ color: 'var(--danger-color)', borderColor: '#fecaca', padding: '0.22rem 0.45rem' }}
                           title="حذف الفاتورة"
                           onClick={() => {
                             if (confirm(`هل أنت متأكد من حذف الفاتورة ${inv.invoiceNumber}؟`)) {
@@ -398,8 +471,8 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
         <div className="modal-overlay">
           <div className="modal-content modal-lg">
             <div className="modal-header">
-              <h3>إنشاء فاتورة مبيعات جديدة</h3>
-              <button className="modal-close" onClick={() => setModalOpen(false)}>×</button>
+              <h3>{editingInvoice ? `✏️ تعديل الفاتورة (${editingInvoice.invoiceNumber})` : 'إنشاء فاتورة مبيعات جديدة'}</h3>
+              <button className="modal-close" onClick={() => { setModalOpen(false); setEditingInvoice(null); }}>×</button>
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
@@ -727,11 +800,11 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                   عملة الفاتورة: <strong>{invoiceCurrency === 'USD' ? '💵 دولار أمريكي ($)' : '🇸🇾 ليرة سورية (ل.س)'}</strong>
                 </span>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)}>
+                  <button type="button" className="btn btn-outline" onClick={() => { setModalOpen(false); setEditingInvoice(null); }}>
                     إلغاء
                   </button>
                   <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1.5rem', fontWeight: 800 }}>
-                    💾 حفظ وإصدار الفاتورة
+                    {editingInvoice ? '💾 حفظ التعديلات' : '💾 حفظ وإصدار الفاتورة'}
                   </button>
                 </div>
               </div>
