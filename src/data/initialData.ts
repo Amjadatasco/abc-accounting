@@ -1,4 +1,4 @@
-import type { Account, Contact, Invoice, JournalEntry, ExpenseBill, CompanySettings, Product, Asset } from '../types/accounting';
+import type { Account, Contact, Invoice, JournalEntry, ExpenseBill, CompanySettings, Product, Asset, Quotation } from '../types/accounting';
 
 export const initialCompanySettings: CompanySettings = {
   companyName: 'ABC للطباعة والإعلان',
@@ -69,6 +69,7 @@ export const initialAccounts: Account[] = [
 export const initialContacts: Contact[] = [];
 
 export const initialInvoices: Invoice[] = [];
+export const initialQuotations: Quotation[] = [];
 
 export const initialExpenses: ExpenseBill[] = [
   // --- مصاريف أمجد بالليرة السورية (سعر الصرف 130 ل.س / $ بحيث 123,950 ل.س = 953 $) ---

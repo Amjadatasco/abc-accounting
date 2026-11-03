@@ -244,3 +244,50 @@ export interface CompanySettings {
   currencySymbol: string;
   logoUrl?: string;
 }
+
+export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'converted';
+
+export interface QuotationItem {
+  id: string;
+  productId?: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  unit?: string;
+  productionSource?: ProductionSource;
+  notes?: string;
+  taxRate?: number;
+  total: number;
+}
+
+export interface Quotation {
+  id: string;
+  quotationNumber: string; // e.g. QUO-2026-001
+  customerId?: string;
+  customerName: string;
+  customerPhone?: string;
+  customerCompany?: string;
+  customerAddress?: string;
+  customerEmail?: string;
+  date: string;
+  validUntil: string;
+  validityDays?: number; // e.g. 7 or 15 days
+  items: QuotationItem[];
+  subtotal: number;
+  discountAmount?: number;
+  taxAmount: number;
+  totalAmount: number;
+  currency?: Currency;
+  currencySymbol?: string;
+  exchangeRate?: number;
+  equivalentAmount?: number;
+  productionSource?: ProductionSource;
+  status: QuotationStatus;
+  deliveryTime?: string; // e.g. 2-4 أيام عمل
+  paymentTerms?: string; // e.g. 50% دفعة مقدمة و50% عند التسليم
+  notes?: string; // شروط وملاحظات تظهر للعميل
+  internalNotes?: string; // ملاحظات خاصة
+  convertedInvoiceId?: string; // إذا تم تحويله لفاتورة
+  createdAt: string;
+  updatedAt?: string;
+}

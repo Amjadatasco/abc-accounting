@@ -8,7 +8,9 @@ import type {
   CompanySettings,
   Currency,
   Product,
-  Asset
+  Asset,
+  Quotation,
+  InvoiceItem
 } from '../types/accounting';
 import { 
   initialAccounts, 
@@ -18,7 +20,8 @@ import {
   initialJournalEntries, 
   initialCompanySettings,
   initialProducts,
-  initialAssets
+  initialAssets,
+  initialQuotations
 } from '../data/initialData';
 
 import { 
@@ -44,6 +47,7 @@ interface AccountingContextType {
   contacts: Contact[];
   products: Product[];
   assets: Asset[];
+  quotations: Quotation[];
   companySettings: CompanySettings;
   
   // Cloud Sync
@@ -76,6 +80,10 @@ interface AccountingContextType {
   addAsset: (asset: Omit<Asset, 'id' | 'createdAt'>) => void;
   updateAsset: (asset: Asset) => void;
   deleteAsset: (id: string) => void;
+  addQuotation: (quotation: Omit<Quotation, 'id' | 'createdAt'>) => Quotation;
+  updateQuotation: (quotation: Quotation) => void;
+  deleteQuotation: (id: string) => void;
+  convertQuotationToInvoice: (quotationId: string) => Invoice | null;
   updateCompanySettings: (settings: CompanySettings) => void;
   resetToDefaultData: () => void;
   exportDataJSON: () => string;
@@ -195,6 +203,16 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
 
+  const [quotations, setQuotations] = useState<Quotation[]>(() => {
+    const saved = localStorage.getItem(`${STORAGE_KEY}_quotations`);
+    if (!saved) return initialQuotations;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return initialQuotations;
+    }
+  });
+
   const sanitizeCompanySettings = (settings: any): CompanySettings => {
     if (!settings) return initialCompanySettings;
     const isOldLegacy = 
@@ -257,6 +275,11 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [assets]);
 
   useEffect(() => {
+    localStorage.setItem(`${STORAGE_KEY}_quotations`, JSON.stringify(quotations));
+    syncQuotationsToCloud(quotations);
+  }, [quotations]);
+
+  useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_settings`, JSON.stringify(companySettings));
   }, [companySettings]);
 
@@ -291,6 +314,20 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
     } catch (err: any) {
       console.warn('Failed to sync assets to cloud:', err);
+    }
+  };
+
+  const syncQuotationsToCloud = async (quotationsList: Quotation[]) => {
+    try {
+      const client = getSupabaseClient();
+      if (!client) return;
+      await client.from('accounting_settings').upsert({
+        id: 'price_quotations',
+        data: quotationsList,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.warn('Failed to sync quotations to cloud:', err);
     }
   };
 
@@ -441,6 +478,15 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
 
+      // Price Quotations
+      if (quotations.length > 0) {
+        await client.from('accounting_settings').upsert({
+          id: 'price_quotations',
+          data: quotations,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
       setIsCloudEnabled(true);
       setCloudSyncStatus('connected');
       setCloudSyncMessage('تم حفظ ومزامنة كافة البيانات السحابية بنجاح! ✓');
@@ -496,6 +542,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const localContacts = getLocal<Contact[]>('contacts', contacts);
       const localProducts = getLocal<Product[]>('products', products);
       const localAssets = getLocal<Asset[]>('assets', assets);
+      const localQuotations = getLocal<Quotation[]>('quotations', quotations);
       const localJournal = getLocal<JournalEntry[]>('journal', journalEntries);
       const localAccounts = getLocal<Account[]>('accounts', accounts);
       const localSettings = getLocal<CompanySettings>('settings', companySettings);
@@ -702,6 +749,30 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         });
       }
 
+      // 9. Price Quotations smart sync
+      const quotesRow = (setRes.data || []).find((r: any) => r.id === 'price_quotations');
+      const cloudQuotations = (quotesRow?.data as Quotation[]) || [];
+      const cloudQuoteIds = new Set(cloudQuotations.map(q => q.id));
+      const extraLocalQuotes = localQuotations.filter(q => !cloudQuoteIds.has(q.id));
+
+      if (extraLocalQuotes.length > 0) {
+        const mergedQuotes = [...cloudQuotations, ...extraLocalQuotes];
+        await client.from('accounting_settings').upsert({
+          id: 'price_quotations',
+          data: mergedQuotes,
+          updated_at: new Date().toISOString(),
+        });
+        setQuotations(mergedQuotes);
+      } else if (cloudQuotations.length > 0) {
+        setQuotations(cloudQuotations);
+      } else if (localQuotations.length > 0) {
+        await client.from('accounting_settings').upsert({
+          id: 'price_quotations',
+          data: localQuotations,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
       setIsCloudEnabled(true);
       setCloudSyncStatus('connected');
       setCloudSyncMessage('متصل بسحابة Supabase ومحدّث بالكامل ✓');
@@ -894,6 +965,116 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       syncAssetsToCloud(updated);
       return updated;
     });
+  };
+
+  // Quotation Actions
+  const addQuotation = (quotationData: Omit<Quotation, 'id' | 'createdAt'>): Quotation => {
+    const id = `quo_${Date.now()}`;
+    const newQuotation: Quotation = {
+      ...quotationData,
+      id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    setQuotations(prev => {
+      const updated = [newQuotation, ...prev];
+      syncQuotationsToCloud(updated);
+      return updated;
+    });
+    return newQuotation;
+  };
+
+  const updateQuotation = (updatedQuote: Quotation) => {
+    setQuotations(prev => {
+      const withUpdate: Quotation = {
+        ...updatedQuote,
+        updatedAt: new Date().toISOString()
+      };
+      const updated = prev.map(q => q.id === updatedQuote.id ? withUpdate : q);
+      syncQuotationsToCloud(updated);
+      return updated;
+    });
+  };
+
+  const deleteQuotation = (id: string) => {
+    setQuotations(prev => {
+      const updated = prev.filter(q => q.id !== id);
+      syncQuotationsToCloud(updated);
+      return updated;
+    });
+  };
+
+  const convertQuotationToInvoice = (quotationId: string): Invoice | null => {
+    const quote = quotations.find(q => q.id === quotationId);
+    if (!quote) return null;
+
+    const custTrimmed = quote.customerName.trim();
+    let finalCustId = quote.customerId;
+    const existingCust = contacts.find(c => c.name.trim().toLowerCase() === custTrimmed.toLowerCase());
+    if (existingCust) {
+      finalCustId = existingCust.id;
+    } else if (custTrimmed) {
+      finalCustId = `cnt_${Date.now()}`;
+      addContact({
+        name: custTrimmed,
+        type: 'customer',
+        phone: quote.customerPhone || 'غير مسجل',
+        company: quote.customerCompany,
+        address: quote.customerAddress,
+        balance: 0,
+        currency: quote.currency || 'USD',
+        currencySymbol: quote.currencySymbol || '$'
+      });
+    }
+
+    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+    const invoiceItems: InvoiceItem[] = quote.items.map((it, idx) => ({
+      id: `item_${Date.now()}_${idx}`,
+      productId: it.productId,
+      description: it.description + (it.unit ? ` (${it.unit})` : ''),
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      taxRate: it.taxRate || 0,
+      total: it.total,
+      productionSource: it.productionSource || quote.productionSource
+    }));
+
+    const newInvoiceData: Omit<Invoice, 'id' | 'createdAt'> = {
+      invoiceNumber,
+      customerId: finalCustId || `cnt_${Date.now()}`,
+      customerName: custTrimmed,
+      date: new Date().toISOString().split('T')[0],
+      dueDate: quote.validUntil || new Date().toISOString().split('T')[0],
+      items: invoiceItems,
+      subtotal: quote.subtotal,
+      taxAmount: quote.taxAmount || 0,
+      totalAmount: quote.totalAmount,
+      currency: quote.currency || 'USD',
+      currencySymbol: quote.currencySymbol || '$',
+      exchangeRate: quote.exchangeRate,
+      equivalentAmount: quote.equivalentAmount,
+      productionSource: quote.productionSource || 'general',
+      saleType: quote.items.some(i => i.productId) ? 'product' : 'service',
+      paymentMethod: 'credit',
+      status: 'unpaid',
+      paidAmount: 0,
+      notes: `تحويل من عرض السعر رقم: ${quote.quotationNumber}${quote.notes ? `\n${quote.notes}` : ''}`,
+      internalNotes: quote.internalNotes
+    };
+
+    addInvoice(newInvoiceData);
+
+    updateQuotation({
+      ...quote,
+      status: 'converted',
+      convertedInvoiceId: invoiceNumber
+    });
+
+    return {
+      ...newInvoiceData,
+      id: `inv_${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
   };
 
   // Add Invoice
@@ -1483,6 +1664,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setContacts([]);
     setProducts(initialProducts);
     setAssets(initialAssets);
+    setQuotations(initialQuotations);
     setCompanySettings(initialCompanySettings);
     localStorage.removeItem(`${STORAGE_KEY}_accounts`);
     localStorage.removeItem(`${STORAGE_KEY}_journal`);
@@ -1491,6 +1673,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     localStorage.removeItem(`${STORAGE_KEY}_contacts`);
     localStorage.removeItem(`${STORAGE_KEY}_products`);
     localStorage.removeItem(`${STORAGE_KEY}_assets`);
+    localStorage.removeItem(`${STORAGE_KEY}_quotations`);
     localStorage.removeItem(`${STORAGE_KEY}_settings`);
 
     // Wipe from cloud if configured
@@ -1546,7 +1729,8 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       expenses,
       contacts,
       products,
-      assets
+      assets,
+      quotations
     };
     return JSON.stringify(fullBackup, null, 2);
   };
@@ -1562,6 +1746,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (data.contacts) setContacts(data.contacts);
         if (data.products) setProducts(data.products);
         if (data.assets) setAssets(data.assets);
+        if (data.quotations) setQuotations(data.quotations);
         if (data.companySettings) setCompanySettings(data.companySettings);
         return true;
       }
@@ -1640,6 +1825,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       contacts,
       products,
       assets,
+      quotations,
       companySettings,
       cloudSyncStatus,
       cloudSyncMessage,
@@ -1668,6 +1854,10 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       addAsset,
       updateAsset,
       deleteAsset,
+      addQuotation,
+      updateQuotation,
+      deleteQuotation,
+      convertQuotationToInvoice,
       updateCompanySettings,
       resetToDefaultData,
       exportDataJSON,
