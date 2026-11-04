@@ -7,7 +7,7 @@ export const initialCompanySettings: CompanySettings = {
   commercialRecord: '',
   phone: '+963995688838',
   email: 'info@abc-print.com',
-  address: 'المدينة الصناعية - باب الهوى / سرمدا',
+  address: 'حمص - جورة الشياح - خلف مقهى الروضة',
   currency: 'دولار أمريكي',
   currencySymbol: '$',
   logoUrl: '/abc_logo.jpg'

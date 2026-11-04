@@ -324,7 +324,7 @@ export const ContactsView: React.FC = () => {
                     <input 
                       type="text" 
                       className="form-input" 
-                      placeholder="المدينة الصناعية - باب الهوى / سرمدا" 
+                      placeholder="حمص - جورة الشياح" 
                       value={address} 
                       onChange={(e) => setAddress(e.target.value)} 
                     />

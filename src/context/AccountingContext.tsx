@@ -242,14 +242,17 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       sanitized.commercialRecord = '';
     }
 
-    // Fix legacy address (e.g. Riyadh / Saudi Arabia)
+    // Fix legacy address (e.g. Riyadh or Bab Al-Hawa) to official Homs address
     if (
       !sanitized.address || 
       sanitized.address.includes('الرياض') || 
       sanitized.address.includes('السعودية') || 
-      sanitized.address.includes('الملك فهد')
+      sanitized.address.includes('الملك فهد') ||
+      sanitized.address.includes('باب الهوى') ||
+      sanitized.address.includes('سرمدا') ||
+      sanitized.address.includes('المدينة الصناعية')
     ) {
-      sanitized.address = 'المدينة الصناعية - باب الهوى / سرمدا';
+      sanitized.address = 'حمص - جورة الشياح - خلف مقهى الروضة';
     }
 
     // Fix legacy phone number to official ABC phone number

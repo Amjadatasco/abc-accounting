@@ -242,8 +242,13 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({ invoice, o
                 <p style={{ fontSize: '0.88rem', color: '#475569', fontWeight: 600 }}>
                   {companySettings.tagline || 'خدمات الطباعة والإعلان والدعاية'}
                 </p>
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
-                  {companySettings.phone && <span>📞 {companySettings.phone}</span>}
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem', display: 'flex', flexWrap: 'wrap', gap: '0.85rem', alignItems: 'center' }}>
+                  {companySettings.phone && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span>📞</span>
+                      <span dir="ltr">{companySettings.phone}</span>
+                    </span>
+                  )}
                   {companySettings.address && <span>📍 {companySettings.address}</span>}
                   {companySettings.commercialRecord ? <span>س.ت: {companySettings.commercialRecord}</span> : null}
                   {companySettings.taxNumber ? <span>الرقم الضريبي: {companySettings.taxNumber}</span> : null}
