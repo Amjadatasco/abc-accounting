@@ -6,7 +6,7 @@ export const initialCompanySettings: CompanySettings = {
   taxNumber: '',
   commercialRecord: '',
   phone: '+963995688838',
-  email: 'info@abc-print.com',
+  email: 'info@abc-prints.com',
   address: 'حمص - جورة الشياح - خلف مقهى الروضة',
   currency: 'دولار أمريكي',
   currencySymbol: '$',

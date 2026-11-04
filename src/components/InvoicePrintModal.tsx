@@ -250,6 +250,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({ invoice, o
                     </span>
                   )}
                   {companySettings.address && <span>📍 {companySettings.address}</span>}
+                  {companySettings.email && <span>✉️ {companySettings.email}</span>}
                   {companySettings.commercialRecord ? <span>س.ت: {companySettings.commercialRecord}</span> : null}
                   {companySettings.taxNumber ? <span>الرقم الضريبي: {companySettings.taxNumber}</span> : null}
                 </div>

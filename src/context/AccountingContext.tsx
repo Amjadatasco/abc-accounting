@@ -266,6 +266,16 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       sanitized.phone = '+963995688838';
     }
 
+    // Fix company email to official address
+    if (
+      !sanitized.email || 
+      sanitized.email === 'info@abc-company.com' ||
+      sanitized.email === 'info@abc-print.com' ||
+      sanitized.email.includes('abc-company')
+    ) {
+      sanitized.email = 'info@abc-prints.com';
+    }
+
     if (!sanitized.logoUrl) {
       sanitized.logoUrl = '/abc_logo.jpg';
     }
