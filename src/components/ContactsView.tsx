@@ -287,7 +287,7 @@ export const ContactsView: React.FC = () => {
                       type="text" 
                       className="form-input" 
                       required 
-                      placeholder="+966 5x xxx xxxx" 
+                      placeholder="+963 9xx xxx xxx" 
                       value={phone} 
                       onChange={(e) => setPhone(e.target.value)} 
                     />
@@ -320,11 +320,11 @@ export const ContactsView: React.FC = () => {
 
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">العنوان الوطني / المدينة</label>
+                    <label className="form-label">العنوان / المدينة</label>
                     <input 
                       type="text" 
                       className="form-input" 
-                      placeholder="الرياض، حي السليمانية" 
+                      placeholder="المدينة الصناعية - باب الهوى / سرمدا" 
                       value={address} 
                       onChange={(e) => setAddress(e.target.value)} 
                     />

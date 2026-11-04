@@ -146,7 +146,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({ invoice, o
       case 'laser': return 'حفر وقص ليزر';
       case 'press': return 'كبس حراري';
       case 'regular_print': return 'طباعة ورقية';
-      case 'external': return 'تنفيذ وتجهيز إعلاني';
+      case 'external': return null; // Never display external/outsource on customer invoice
       default: return null;
     }
   };

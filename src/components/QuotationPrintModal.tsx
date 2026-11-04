@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Quotation } from '../types/accounting';
 import { useAccounting } from '../context/AccountingContext';
-import { getProductionSourceDetails } from '../types/accounting';
 
 interface QuotationPrintModalProps {
   quotation: Quotation;
@@ -128,7 +127,7 @@ export const QuotationPrintModal: React.FC<QuotationPrintModalProps> = ({ quotat
       (quotation.deliveryTime ? `\n\n⏱️ *مدة التسليم:* ${quotation.deliveryTime}` : '') +
       (quotation.paymentTerms ? `\n💳 *شروط الدفع:* ${quotation.paymentTerms}` : '') +
       (quotation.notes ? `\n📌 *ملاحظات:* ${quotation.notes}` : '') +
-      `\n\nللتواصل والاستفسار: ${companySettings.phone || '+963 959 500 533'}`;
+      `\n\nللتواصل والاستفسار: ${companySettings.phone || '+963995688838'}`;
 
     navigator.clipboard.writeText(summary);
     alert('تم نسخ ملخص عرض السعر بنجاح! يمكنك الآن لصقه مباشرة في واتساب للعميل.');
@@ -307,11 +306,6 @@ export const QuotationPrintModal: React.FC<QuotationPrintModalProps> = ({ quotat
                      quotation.status === 'sent' ? 'تم تقديمه للعميل' : 'مسودة'}
                   </span>
                 </div>
-                {quotation.productionSource && (
-                  <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.4rem 0 0' }}>
-                    بند التنفيذ الرئيسي: <strong style={{ color: '#0f172a' }}>{getProductionSourceDetails(quotation.productionSource).label}</strong>
-                  </p>
-                )}
               </div>
             </div>
 
@@ -322,16 +316,14 @@ export const QuotationPrintModal: React.FC<QuotationPrintModalProps> = ({ quotat
                   <tr style={{ backgroundColor: '#f1f5f9' }}>
                     <th style={{ width: '40px', textAlign: 'center', padding: '0.65rem 0.5rem', fontWeight: 800, fontSize: '0.82rem' }}>#</th>
                     <th style={{ textAlign: 'right', padding: '0.65rem 0.75rem', fontWeight: 800, fontSize: '0.82rem' }}>بيان الخدمة / الصنف / المواصفات الفنية</th>
-                    <th style={{ width: '90px', textAlign: 'center', padding: '0.65rem 0.5rem', fontWeight: 800, fontSize: '0.82rem' }}>نوع التنفيذ</th>
-                    <th style={{ width: '65px', textAlign: 'center', padding: '0.65rem 0.5rem', fontWeight: 800, fontSize: '0.82rem' }}>الوحدة</th>
-                    <th style={{ width: '70px', textAlign: 'center', padding: '0.65rem 0.5rem', fontWeight: 800, fontSize: '0.82rem' }}>الكمية</th>
-                    <th style={{ width: '110px', textAlign: 'left', padding: '0.65rem 0.75rem', fontWeight: 800, fontSize: '0.82rem' }}>السعر الإفرادي</th>
-                    <th style={{ width: '120px', textAlign: 'left', padding: '0.65rem 0.75rem', fontWeight: 800, fontSize: '0.82rem' }}>المجموع</th>
+                    <th style={{ width: '80px', textAlign: 'center', padding: '0.65rem 0.5rem', fontWeight: 800, fontSize: '0.82rem' }}>الوحدة</th>
+                    <th style={{ width: '75px', textAlign: 'center', padding: '0.65rem 0.5rem', fontWeight: 800, fontSize: '0.82rem' }}>الكمية</th>
+                    <th style={{ width: '120px', textAlign: 'left', padding: '0.65rem 0.75rem', fontWeight: 800, fontSize: '0.82rem' }}>السعر الإفرادي</th>
+                    <th style={{ width: '130px', textAlign: 'left', padding: '0.65rem 0.75rem', fontWeight: 800, fontSize: '0.82rem' }}>المجموع</th>
                   </tr>
                 </thead>
                 <tbody>
                   {quotation.items.map((item, idx) => {
-                    const srcInfo = getProductionSourceDetails(item.productionSource || quotation.productionSource);
                     return (
                       <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? 'white' : '#fafafa' }}>
                         <td style={{ textAlign: 'center', color: '#64748b', fontSize: '0.85rem', padding: '0.65rem 0.5rem' }}>
@@ -344,9 +336,6 @@ export const QuotationPrintModal: React.FC<QuotationPrintModalProps> = ({ quotat
                               🔹 {item.notes}
                             </div>
                           )}
-                        </td>
-                        <td style={{ textAlign: 'center', padding: '0.65rem 0.5rem', fontSize: '0.76rem', color: '#475569' }}>
-                          {srcInfo.label}
                         </td>
                         <td style={{ textAlign: 'center', padding: '0.65rem 0.5rem', fontSize: '0.8rem', color: '#475569' }}>
                           {item.unit || 'قطعة'}

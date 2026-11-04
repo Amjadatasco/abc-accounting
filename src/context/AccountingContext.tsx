@@ -215,29 +215,69 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const sanitizeCompanySettings = (settings: any): CompanySettings => {
     if (!settings) return initialCompanySettings;
-    const isOldLegacy = 
-      settings.companyName?.includes('للخدمات والتجارة') || 
-      settings.companyName === 'مطبعة وإعلانات ABC' ||
-      settings.tagline?.includes('الأعمال الذكية') ||
-      settings.taxNumber === '300123456700003' ||
-      settings.commercialRecord === '1010456789';
+    const sanitized = { ...settings };
 
-    if (isOldLegacy) {
-      return {
-        ...settings,
-        companyName: 'ABC للطباعة والإعلان',
-        tagline: 'خدمات الطباعة والإعلان والدعاية',
-        taxNumber: settings.taxNumber === '300123456700003' ? '' : (settings.taxNumber || ''),
-        commercialRecord: settings.commercialRecord === '1010456789' ? '' : (settings.commercialRecord || '')
-      };
+    // Company Name & Tagline
+    if (
+      !sanitized.companyName ||
+      sanitized.companyName.includes('للخدمات والتجارة') || 
+      sanitized.companyName === 'مطبعة وإعلانات ABC'
+    ) {
+      sanitized.companyName = 'ABC للطباعة والإعلان';
     }
-    return settings as CompanySettings;
+
+    if (
+      !sanitized.tagline || 
+      sanitized.tagline.includes('الأعمال الذكية') ||
+      sanitized.tagline.includes('رقمية')
+    ) {
+      sanitized.tagline = 'خدمات الطباعة والإعلان والدعاية والتنفيذ';
+    }
+
+    // Clear legacy dummy Saudi tax / CR numbers
+    if (sanitized.taxNumber === '300123456700003') {
+      sanitized.taxNumber = '';
+    }
+    if (sanitized.commercialRecord === '1010456789') {
+      sanitized.commercialRecord = '';
+    }
+
+    // Fix legacy address (e.g. Riyadh / Saudi Arabia)
+    if (
+      !sanitized.address || 
+      sanitized.address.includes('الرياض') || 
+      sanitized.address.includes('السعودية') || 
+      sanitized.address.includes('الملك فهد')
+    ) {
+      sanitized.address = 'المدينة الصناعية - باب الهوى / سرمدا';
+    }
+
+    // Fix legacy phone number to official ABC phone number
+    if (
+      !sanitized.phone || 
+      sanitized.phone.includes('966') || 
+      sanitized.phone.includes('123 4567') || 
+      sanitized.phone.includes('959 500 533') ||
+      sanitized.phone === '+963 959 500 533'
+    ) {
+      sanitized.phone = '+963995688838';
+    }
+
+    if (!sanitized.logoUrl) {
+      sanitized.logoUrl = '/abc_logo.jpg';
+    }
+
+    return sanitized as CompanySettings;
   };
 
   const [companySettings, setCompanySettings] = useState<CompanySettings>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_settings`);
-      return saved ? sanitizeCompanySettings(JSON.parse(saved)) : initialCompanySettings;
+      const parsed = saved ? sanitizeCompanySettings(JSON.parse(saved)) : initialCompanySettings;
+      if (saved && JSON.stringify(parsed) !== saved) {
+        localStorage.setItem(`${STORAGE_KEY}_settings`, JSON.stringify(parsed));
+      }
+      return parsed;
     } catch {
       return initialCompanySettings;
     }

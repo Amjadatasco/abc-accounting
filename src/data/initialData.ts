@@ -2,10 +2,10 @@ import type { Account, Contact, Invoice, JournalEntry, ExpenseBill, CompanySetti
 
 export const initialCompanySettings: CompanySettings = {
   companyName: 'ABC للطباعة والإعلان',
-  tagline: 'خدمات الطباعة والإعلان والدعاية',
+  tagline: 'خدمات الطباعة والإعلان والدعاية والتنفيذ',
   taxNumber: '',
   commercialRecord: '',
-  phone: '+963 959 500 533',
+  phone: '+963995688838',
   email: 'info@abc-print.com',
   address: 'المدينة الصناعية - باب الهوى / سرمدا',
   currency: 'دولار أمريكي',
