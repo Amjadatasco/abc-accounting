@@ -10,12 +10,13 @@ import { ContactsView } from './components/ContactsView';
 import { ProductsView } from './components/ProductsView';
 import { AssetsView } from './components/AssetsView';
 import { QuotationsView } from './components/QuotationsView';
+import { ExternalSourcesView } from './components/ExternalSourcesView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import type { ProductionSource } from './types/accounting';
 
 const MainApp = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'sales' | 'quotations' | 'products' | 'assets' | 'invoices' | 'expenses' | 'contacts' | 'journal' | 'accounts' | 'reports' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'sales' | 'quotations' | 'external' | 'products' | 'assets' | 'invoices' | 'expenses' | 'contacts' | 'journal' | 'accounts' | 'reports' | 'settings'>('dashboard');
   const [salesInitialSource, setSalesInitialSource] = useState<ProductionSource | undefined>(undefined);
   const [salesModalTrigger, setSalesModalTrigger] = useState(0);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -29,6 +30,7 @@ const MainApp = () => {
     { id: 'dashboard', label: 'لوحة التحكم', icon: '📊' },
     { id: 'sales', label: 'المبيعات والخدمات', icon: '🛒' },
     { id: 'quotations', label: 'عروض الأسعار', icon: '📋' },
+    { id: 'external', label: 'مصادر خارجية وتنفيذ', icon: '🌐' },
     { id: 'products', label: 'البضائع والمنتجات', icon: '📦' },
     { id: 'assets', label: 'الأصول والماكينات', icon: '🖨️' },
     { id: 'invoices', label: 'فواتير المبيعات', icon: '🧾', badge: unpaidCount > 0 ? unpaidCount : undefined, badgeColor: 'badge-orange' },
@@ -180,6 +182,18 @@ const MainApp = () => {
         {activeTab === 'quotations' && (
           <QuotationsView 
             onNavigateToInvoices={() => setActiveTab('invoices')} 
+          />
+        )}
+
+        {activeTab === 'external' && (
+          <ExternalSourcesView 
+            onNavigateToSalesWithSource={(source) => {
+              setSalesInitialSource(source);
+              setSalesModalTrigger(prev => prev + 1);
+              setActiveTab('sales');
+            }}
+            onNavigateToQuotations={() => setActiveTab('quotations')}
+            onNavigateToInvoices={() => setActiveTab('invoices')}
           />
         )}
 
