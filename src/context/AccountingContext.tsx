@@ -165,7 +165,17 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const [contacts, setContacts] = useState<Contact[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_contacts`);
-    return saved ? JSON.parse(saved) : initialContacts;
+    if (!saved) return initialContacts;
+    try {
+      const parsed: Contact[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map(c => c.id));
+      const missing = initialContacts.filter(c => !existingIds.has(c.id));
+      const finalContacts = missing.length > 0 ? [...parsed, ...missing] : parsed;
+      localStorage.setItem(`${STORAGE_KEY}_contacts`, JSON.stringify(finalContacts));
+      return finalContacts;
+    } catch {
+      return initialContacts;
+    }
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
@@ -658,10 +668,13 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
       const cloudExpIds = new Set(cloudExpenses.map(e => e.id));
       const extraLocalExpenses = localExpenses.filter(e => !cloudExpIds.has(e.id));
+      const existingAllExpIds = new Set([...cloudExpIds, ...localExpenses.map(e => e.id)]);
+      const missingInitialExpenses = initialExpenses.filter(e => !existingAllExpIds.has(e.id));
+      const allNewExpenses = [...extraLocalExpenses, ...missingInitialExpenses];
 
-      if (extraLocalExpenses.length > 0 || needsCloudUpdate) {
+      if (allNewExpenses.length > 0 || needsCloudUpdate) {
         const toUpsert = [
-          ...extraLocalExpenses,
+          ...allNewExpenses,
           ...(needsCloudUpdate ? cloudExpenses.filter(e => initialExpenseMap.has(e.id)) : [])
         ];
         if (toUpsert.length > 0) {
@@ -684,7 +697,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           );
         }
       }
-      const finalExpenses = [...cloudExpenses, ...extraLocalExpenses];
+      const finalExpenses = [...cloudExpenses, ...extraLocalExpenses, ...missingInitialExpenses];
       if (finalExpenses.length > 0 || cloudExpenses.length > 0) {
         setExpenses(finalExpenses);
       }
@@ -693,10 +706,13 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const cloudContacts = (conRes.data || []).map(r => r.data as Contact);
       const cloudConIds = new Set(cloudContacts.map(c => c.id));
       const extraLocalContacts = localContacts.filter(c => !cloudConIds.has(c.id));
+      const existingAllConIds = new Set([...cloudConIds, ...localContacts.map(c => c.id)]);
+      const missingInitialContacts = initialContacts.filter(c => !existingAllConIds.has(c.id));
+      const allNewContacts = [...extraLocalContacts, ...missingInitialContacts];
 
-      if (extraLocalContacts.length > 0) {
+      if (allNewContacts.length > 0) {
         await client.from('accounting_contacts').upsert(
-          extraLocalContacts.map(c => ({
+          allNewContacts.map(c => ({
             id: c.id,
             name: c.name,
             type: c.type,
@@ -707,7 +723,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }))
         );
       }
-      const finalContacts = [...cloudContacts, ...extraLocalContacts];
+      const finalContacts = [...cloudContacts, ...extraLocalContacts, ...missingInitialContacts];
       if (finalContacts.length > 0 || cloudContacts.length > 0) {
         setContacts(finalContacts);
       }
@@ -720,8 +736,10 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const cleanLocalProducts = localProducts.filter(p => !oldProdIds.has(p.id));
       const cloudProdIds = new Set(cloudProducts.map(p => p.id));
       const extraLocalProducts = cleanLocalProducts.filter(p => !cloudProdIds.has(p.id));
+      const existingAllProdIds = new Set([...cloudProdIds, ...cleanLocalProducts.map(p => p.id)]);
+      const missingInitialProducts = initialProducts.filter(p => !oldProdIds.has(p.id) && !existingAllProdIds.has(p.id));
 
-      const mergedProd = [...cloudProducts, ...extraLocalProducts];
+      const mergedProd = [...cloudProducts, ...extraLocalProducts, ...missingInitialProducts];
       await client.from('accounting_settings').upsert({
         id: 'inventory_products',
         data: mergedProd,

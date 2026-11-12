@@ -68,7 +68,20 @@ export const initialAccounts: Account[] = [
   { id: 'acc_5900', code: '5900', name: 'اشتراكات برامج تصميم وتراخيص (Adobe / RIP)', category: 'expense', type: 'debit', balance: 0, parentId: 'acc_5000' }
 ];
 
-export const initialContacts: Contact[] = [];
+export const initialContacts: Contact[] = [
+  {
+    id: 'cnt_raslan_01',
+    type: 'vendor',
+    name: 'ليزر رسلان',
+    company: 'ليزر رسلان - لصناعة الستندات والديكورات (شهادة حرفية رقم: 1198)',
+    phone: '0944558059',
+    address: 'حمص - سوريا',
+    currency: 'USD',
+    currencySymbol: '$',
+    balance: 0,
+    createdAt: '2026-02-12'
+  }
+];
 
 export const initialInvoices: Invoice[] = [];
 export const initialQuotations: Quotation[] = [];
@@ -852,6 +865,45 @@ export const initialExpenses: ExpenseBill[] = [
     status: 'paid',
     notes: 'أحبار ماكينة DTF ألبسة: 2 عبوة أبيض ($70) + 1 أحمر ($35) + 1 أزرق ($35) + 1 أسود ($35) + 1 أصفر ($35) - إجمالي 6 عبوات من مطبعة الفؤاد',
     createdAt: '2026-09-08'
+  },
+  // --- مشتريات بضائع ومواد خام ليزر رسلان (سددها الشريك أمجد من حسابه الخاص) ---
+  {
+    id: 'exp_raslan_01',
+    billNumber: 'EXP-2026-051',
+    vendorId: 'cnt_raslan_01',
+    vendorName: 'ليزر رسلان - لصناعة الستندات والديكورات',
+    accountId: 'acc_5140', // مشتريات بضائع ومواد خام للتصنيع وإعادة البيع
+    date: '2026-02-12',
+    amount: 14.1,
+    taxAmount: 0,
+    currency: 'USD',
+    currencySymbol: '$',
+    exchangeRate: 14800,
+    equivalentAmount: 208680,
+    paymentMethod: 'cash',
+    paidBy: 'amjad',
+    status: 'paid',
+    notes: 'إذن تسليم رقم 000340 من ليزر رسلان: بلكسي دائرة شفاف (1.5$) + بلكسي مستطيل شفاف 4 قطع (4.4$) + روماك فضي (1.2$) + لوح ذهبي كحلي (7$) - سدده أمجد من حسابه الخاص',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'exp_raslan_02',
+    billNumber: 'EXP-2026-052',
+    vendorId: 'cnt_raslan_01',
+    vendorName: 'ليزر رسلان - لصناعة الستندات والديكورات',
+    accountId: 'acc_5140', // مشتريات بضائع ومواد خام للتصنيع وإعادة البيع
+    date: '2026-02-12',
+    amount: 19.6,
+    taxAmount: 0,
+    currency: 'USD',
+    currencySymbol: '$',
+    exchangeRate: 14800,
+    equivalentAmount: 290080,
+    paymentMethod: 'cash',
+    paidBy: 'amjad',
+    status: 'paid',
+    notes: 'إذن تسليم رقم 000341 من ليزر رسلان: شفاف 44*20 قطعتين (4.5$) + شفاف 20*20 عدد 7 قطع (7.7$) + حليبي 15*25 قطعتين (2.7$) + حليبي 15*20 قطعتين (1.4$) + حليبي 12.5*20 قطعة (0.9$) + فضي 20*20 قطعتين (2.4$) - سدده أمجد من حسابه الخاص',
+    createdAt: '2026-02-12'
   }
 ];
 
@@ -1357,6 +1409,157 @@ export const initialProducts: Product[] = [
     unit: 'قاعدة',
     notes: 'عرض أسعار مطبعة الفؤاد بتاريخ 2026-09-08',
     createdAt: '2026-09-08'
+  },
+  // --- بضائع ومواد خام - ليزر رسلان (حمص - إذني تسليم 000340 و 000341) ---
+  {
+    id: 'prd_raslan_01',
+    name: 'بلكسي دائري شفاف 20×20 سم',
+    code: 'PRD-PLX-CIR20',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 1.5,
+    sellingPrice: 3.5,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 1,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد)',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_02',
+    name: 'بلكسي مستطيل شفاف 20×20 سم',
+    code: 'PRD-PLX-REC20',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 1.1,
+    sellingPrice: 2.5,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 4,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 4.4$',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_03',
+    name: 'روماك فضي حفر ليزر 20×20 سم',
+    code: 'PRD-ROM-SLV20-1',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 1.2,
+    sellingPrice: 3.0,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 1,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد)',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_04',
+    name: 'لوح بلكسي ذهبي كحلي 20×20 سم',
+    code: 'PRD-PLX-GLD20',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 7.0,
+    sellingPrice: 12.0,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 1,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد)',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_05',
+    name: 'بلكسي شفاف كبير 44×20 سم',
+    code: 'PRD-PLX-CLR4420',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 2.25,
+    sellingPrice: 5.0,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 2,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 4.5$',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_06',
+    name: 'بلكسي شفاف 20×20 سم',
+    code: 'PRD-PLX-CLR20',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 1.1,
+    sellingPrice: 2.5,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 7,
+    minQuantityAlert: 2,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 7.7$',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_07',
+    name: 'بلكسي حليبي (أبيض مثلج) 15×25 سم',
+    code: 'PRD-PLX-MLK1525',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 1.35,
+    sellingPrice: 3.0,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 2,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 2.7$',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_08',
+    name: 'بلكسي حليبي (أبيض مثلج) 15×20 سم',
+    code: 'PRD-PLX-MLK1520',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 0.7,
+    sellingPrice: 2.0,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 2,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 1.4$',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_09',
+    name: 'بلكسي حليبي (أبيض مثلج) 12.5×20 سم',
+    code: 'PRD-PLX-MLK1220',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 0.9,
+    sellingPrice: 2.0,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 1,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد)',
+    createdAt: '2026-02-12'
+  },
+  {
+    id: 'prd_raslan_10',
+    name: 'روماك فضي حفر ليزر 20×20 سم (إذن 341)',
+    code: 'PRD-ROM-SLV20-2',
+    category: 'ألواح بلكسي وروماك ومواد خام',
+    costPrice: 1.2,
+    sellingPrice: 3.0,
+    currency: 'USD',
+    currencySymbol: '$',
+    quantity: 2,
+    minQuantityAlert: 1,
+    unit: 'لوح',
+    notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 2.4$',
+    createdAt: '2026-02-12'
   }
 ];
 
