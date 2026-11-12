@@ -42,6 +42,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     setQuantity('1');
     setUnitPrice('');
     setTotalAmountInput('');
+    setCostPrice('');
+    setTotalCostInput('');
     setPaymentMethod('cash');
     setPaymentStatus('paid');
     setPartialAmount('');
@@ -71,6 +73,11 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     setUnitPrice(firstItem ? String(firstItem.unitPrice) : '');
     setSelectedProductId(firstItem?.productId || '');
     setTotalAmountInput(String(sale.totalAmount || ''));
+
+    const savedCost = sale.costPrice !== undefined ? sale.costPrice : firstItem?.costPrice;
+    const savedTotalCost = sale.totalCost !== undefined ? sale.totalCost : (savedCost !== undefined ? savedCost * (firstItem?.quantity || 1) : undefined);
+    setCostPrice(savedCost !== undefined ? String(savedCost) : '');
+    setTotalCostInput(savedTotalCost !== undefined ? String(savedTotalCost) : '');
 
     setPaymentMethod(sale.paymentMethod || 'cash');
     setPaymentStatus(sale.status || 'paid');
@@ -108,6 +115,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   const [quantity, setQuantity] = useState('1');
   const [unitPrice, setUnitPrice] = useState('');
   const [totalAmountInput, setTotalAmountInput] = useState('');
+  const [costPrice, setCostPrice] = useState('');
+  const [totalCostInput, setTotalCostInput] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'sham_cash' | 'cash' | 'bank' | 'credit'>('sham_cash');
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid' | 'partial'>('paid');
   const [partialAmount, setPartialAmount] = useState('');
@@ -119,12 +128,20 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   const currSym = currency === 'SYP' ? 'ل.س' : '$';
   const currentRateNum = parseFloat(exchangeRate) || 14800;
   const currentTotalNum = parseFloat(totalAmountInput) || ((parseFloat(quantity) || 1) * (parseFloat(unitPrice) || 0));
+  const currentUnitCostNum = parseFloat(costPrice) || 0;
+  const currentTotalCostNum = parseFloat(totalCostInput) || ((parseFloat(quantity) || 1) * currentUnitCostNum);
+  const currentProfitNum = currentTotalNum - currentTotalCostNum;
+  const currentProfitMargin = currentTotalNum > 0 ? (currentProfitNum / currentTotalNum) * 100 : 0;
 
   const selectedProduct = products.find(p => p.id === selectedProductId);
 
   const handleProductSelect = (id: string) => {
     setSelectedProductId(id);
-    if (!id) return;
+    if (!id) {
+      setCostPrice('');
+      setTotalCostInput('');
+      return;
+    }
     const p = products.find(prod => prod.id === id);
     if (p) {
       setItemDescription(p.name);
@@ -132,6 +149,13 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       setUnitPrice(String(p.sellingPrice));
       const q = parseFloat(quantity) || 1;
       setTotalAmountInput(formatNumberClean(p.sellingPrice * q));
+      if (p.costPrice !== undefined) {
+        setCostPrice(String(p.costPrice));
+        setTotalCostInput(formatNumberClean(p.costPrice * q));
+      } else {
+        setCostPrice('');
+        setTotalCostInput('');
+      }
     }
   };
 
@@ -139,6 +163,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
   // When quantity changes: update total if unitPrice exists, or update unitPrice if total exists
   // When unitPrice changes: update total
   // When total changes: update unitPrice
+  // When costPrice changes: update totalCost
+  // When totalCost changes: update costPrice
   const formatNumberClean = (num: number): string => {
     if (isNaN(num) || !isFinite(num)) return '';
     const rounded = Math.round(num * 10000) / 10000;
@@ -155,6 +181,11 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
         setTotalAmountInput(formatNumberClean(q * p));
       } else if (totalAmountInput !== '' && !isNaN(t) && t > 0) {
         setUnitPrice(formatNumberClean(t / q));
+      }
+
+      const cp = parseFloat(costPrice);
+      if (costPrice !== '' && !isNaN(cp) && cp >= 0) {
+        setTotalCostInput(formatNumberClean(q * cp));
       }
     }
   };
@@ -178,6 +209,28 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       setUnitPrice(formatNumberClean(t / q));
     } else if (val === '') {
       setUnitPrice('');
+    }
+  };
+
+  const handleCostPriceChange = (val: string) => {
+    setCostPrice(val);
+    const cp = parseFloat(val);
+    const q = parseFloat(quantity) || 1;
+    if (val !== '' && !isNaN(cp) && cp >= 0 && q > 0) {
+      setTotalCostInput(formatNumberClean(q * cp));
+    } else if (val === '') {
+      setTotalCostInput('');
+    }
+  };
+
+  const handleTotalCostChange = (val: string) => {
+    setTotalCostInput(val);
+    const tc = parseFloat(val);
+    const q = parseFloat(quantity) || 1;
+    if (val !== '' && !isNaN(tc) && tc >= 0 && q > 0) {
+      setCostPrice(formatNumberClean(tc / q));
+    } else if (val === '') {
+      setCostPrice('');
     }
   };
 
@@ -294,6 +347,11 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       paidAmount = parseFloat(partialAmount) || 0;
     }
 
+    const costPriceNum = parseFloat(costPrice) || 0;
+    const totalCostNum = parseFloat(totalCostInput) || (qtyNum * costPriceNum);
+    const totalProfitNum = totalAmount - totalCostNum;
+    const productPayer = selectedProduct?.paidBy || editingSale?.productPayer;
+
     const invoiceNumber = editingSale ? editingSale.invoiceNumber : `INV-${Date.now().toString().slice(-6)}`;
     const finalRate = parseFloat(exchangeRate) || 14800;
     const finalEquivalent = currency === 'USD'
@@ -313,6 +371,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
           description: itemTrimmed,
           quantity: qtyNum,
           unitPrice: priceNum,
+          costPrice: costPriceNum > 0 ? costPriceNum : undefined,
           taxRate: 0,
           total: totalAmount,
           productionSource: isExternal ? 'external' : productionSource
@@ -332,6 +391,10 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
       paidAmount,
       notes: notes.trim(),
       internalNotes: internalNotes.trim(),
+      costPrice: costPriceNum > 0 ? costPriceNum : undefined,
+      totalCost: totalCostNum > 0 ? totalCostNum : undefined,
+      totalProfit: (costPriceNum > 0 || totalCostNum > 0) ? totalProfitNum : undefined,
+      productPayer: productPayer,
       externalSupplierName: isExternal ? externalSupplier.trim() : undefined,
       externalCost: isExternal && extCostNum > 0 ? extCostNum : undefined,
       externalPaymentMethod: isExternal ? externalPaymentMethod : undefined,
@@ -410,6 +473,8 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
     setQuantity('1');
     setUnitPrice('');
     setTotalAmountInput('');
+    setCostPrice('');
+    setTotalCostInput('');
     setPartialAmount('');
     setNotes('');
     setInternalNotes('');
@@ -464,6 +529,14 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
 
   const extUSD = extSales.filter(i => (i.currency || 'USD') === 'USD').reduce((s, i) => s + i.totalAmount, 0);
   const extSYP = extSales.filter(i => (i.currency || 'USD') === 'SYP').reduce((s, i) => s + i.totalAmount, 0);
+
+  // Realized profit & capital cost from sales
+  const totalCostUSD = salesUSD.reduce((s, i) => s + (i.totalCost || i.externalCost || 0), 0);
+  const totalProfitUSD = salesUSD.reduce((s, i) => {
+    if (i.totalProfit !== undefined) return s + i.totalProfit;
+    if (i.externalCost) return s + (i.totalAmount - i.externalCost);
+    return s;
+  }, 0);
 
   return (
     <div>
@@ -546,6 +619,20 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
           </div>
           <div className="stat-footer">
             <span>تشمل مبيعات الخدمات والمنتجات للعملاء</span>
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderRight: '4px solid #f59e0b' }}>
+          <div className="stat-header">
+            <span className="stat-title">صافي أرباح المبيعات المحققة</span>
+            <span className="badge badge-orange">📈 أرباح المبيعات</span>
+          </div>
+          <div className="stat-value" style={{ color: '#d97706' }}>
+            $ {totalProfitUSD.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+          </div>
+          <div className="stat-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#92400e' }}>رأس المال المسترد: $ {totalCostUSD.toLocaleString()}</span>
+            {totalUSD > 0 && <span style={{ color: 'var(--text-muted)' }}>هامش: {Math.round((totalProfitUSD / totalUSD) * 100)}%</span>}
           </div>
         </div>
       </div>
@@ -991,7 +1078,19 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                         ) : null}
                         {sale.externalCost && sale.externalCost > 0 ? (
                           <div style={{ fontSize: '0.72rem', color: '#16a34a', fontWeight: 800, marginTop: '0.15rem' }}>
-                            ربح: {saleSym} {(sale.totalAmount - sale.externalCost).toLocaleString()}
+                            صافي ربح: {saleSym} {(sale.totalAmount - sale.externalCost).toLocaleString()}
+                          </div>
+                        ) : (sale.totalCost && sale.totalCost > 0) ? (
+                          <div style={{ fontSize: '0.72rem', marginTop: '0.15rem' }}>
+                            <span style={{ color: '#92400e', fontWeight: 700 }}>رأس المال: {saleSym} {sale.totalCost.toLocaleString()}</span>
+                            <span style={{ color: '#16a34a', fontWeight: 800, marginRight: '0.3rem' }}>
+                              | ربح: +{saleSym} {((sale.totalProfit !== undefined ? sale.totalProfit : (sale.totalAmount - sale.totalCost))).toLocaleString()}
+                            </span>
+                            {sale.productPayer && (
+                              <span style={{ display: 'block', fontSize: '0.67rem', color: '#64748b', fontWeight: 600 }}>
+                                تمويل: {sale.productPayer === 'amjad' ? 'أمجد' : sale.productPayer === 'nour' ? 'نور' : 'صندوق الشركة'}
+                              </span>
+                            )}
                           </div>
                         ) : null}
                       </td>
@@ -1344,7 +1443,7 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                     <label className="form-label" style={{ fontWeight: 800, color: '#166534', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>📦 اختر البضاعة من المخزن</span>
                       <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#15803d' }}>
-                        (يتم خصم الكمية من صفحة البضائع تلقائياً)
+                        (يتم تعبئة تكلفة رأس المال وسعر البيع وخصم الكمية تلقائياً)
                       </span>
                     </label>
                     <select
@@ -1353,27 +1452,88 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                       onChange={(e) => handleProductSelect(e.target.value)}
                       style={{ fontWeight: 700, backgroundColor: '#ffffff', borderColor: '#86efac' }}
                     >
-                      <option value="">-- اختر البضاعة من قائمة المخزن (لتعبئة السعر وخصم الكمية) --</option>
+                      <option value="">-- اختر البضاعة من قائمة المخزن (لتعبئة الأسعار ورأس المال تلقائياً) --</option>
                       {products.map(p => {
                         const sym = p.currencySymbol || (p.currency === 'SYP' ? 'ل.س' : '$');
+                        const unitProfit = p.sellingPrice - p.costPrice;
+                        const payerLabel = p.paidBy === 'amjad' ? 'أمجد' : p.paidBy === 'nour' ? 'نور' : 'صندوق الشركة';
                         return (
                           <option key={p.id} value={p.id}>
-                            {p.name} (المتوفر: {p.quantity} {p.unit || 'قطعة'} — السعر: {sym} {p.sellingPrice.toLocaleString()})
+                            {p.name} (المتوفر: {p.quantity} {p.unit || 'قطعة'} — رأس المال: {sym}{p.costPrice.toLocaleString()} | سعر البيع: {sym}{p.sellingPrice.toLocaleString()} | الربح: +{sym}{unitProfit.toFixed(2)}) [{payerLabel}]
                           </option>
                         );
                       })}
                     </select>
 
                     {selectedProduct && (
-                      <div style={{ marginTop: '0.6rem', padding: '0.45rem 0.65rem', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #dcfce7', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div>
-                          الرصيد المتوفر بالمخزن: <strong style={{ color: selectedProduct.quantity > (selectedProduct.minQuantityAlert || 5) ? '#16a34a' : '#d97706', fontSize: '0.95rem' }}>{selectedProduct.quantity} {selectedProduct.unit || 'قطعة'}</strong>
-                          {selectedProduct.category && <span style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>({selectedProduct.category})</span>}
+                      <div style={{
+                        marginTop: '0.75rem',
+                        padding: '0.75rem 1rem',
+                        backgroundColor: '#ffffff',
+                        borderRadius: '8px',
+                        border: '1.5px solid #86efac',
+                        boxShadow: '0 1px 3px rgba(22,163,74,0.08)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.55rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 800, color: '#166534', fontSize: '0.95rem' }}>
+                              📦 {selectedProduct.name}
+                            </span>
+                            {selectedProduct.category && (
+                              <span className="badge" style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', fontSize: '0.75rem' }}>
+                                {selectedProduct.category}
+                              </span>
+                            )}
+                          </div>
+                          <div>
+                            الرصيد المتوفر بالمخزن: <strong style={{ color: selectedProduct.quantity > (selectedProduct.minQuantityAlert || 5) ? '#16a34a' : '#d97706', fontSize: '1rem' }}>{selectedProduct.quantity} {selectedProduct.unit || 'قطعة'}</strong>
+                          </div>
                         </div>
+
+                        {/* Financial breakdown of this product */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                          gap: '0.5rem',
+                          padding: '0.55rem 0.75rem',
+                          backgroundColor: '#f0fdf4',
+                          borderRadius: '6px',
+                          border: '1px solid #dcfce7',
+                          fontSize: '0.8rem'
+                        }}>
+                          <div>
+                            <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>💼 تكلفة رأس المال للقطعة:</span>
+                            <strong style={{ color: '#92400e', fontSize: '0.95rem' }}>{currSym} {selectedProduct.costPrice.toLocaleString()}</strong>
+                          </div>
+                          <div>
+                            <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>🏷️ سعر البيع الافتراضي:</span>
+                            <strong style={{ color: '#2563eb', fontSize: '0.95rem' }}>{currSym} {selectedProduct.sellingPrice.toLocaleString()}</strong>
+                          </div>
+                          <div>
+                            <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>📈 صافي ربح القطعة:</span>
+                            <strong style={{ color: '#16a34a', fontSize: '0.95rem' }}>
+                              + {currSym} {(selectedProduct.sellingPrice - selectedProduct.costPrice).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                            </strong>
+                          </div>
+                          <div>
+                            <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>👤 دافع رأس المال:</span>
+                            <span className="badge" style={{
+                              backgroundColor: selectedProduct.paidBy === 'amjad' ? '#eff6ff' : selectedProduct.paidBy === 'nour' ? '#fdf2f8' : '#f8fafc',
+                              color: selectedProduct.paidBy === 'amjad' ? '#1d4ed8' : selectedProduct.paidBy === 'nour' ? '#be185d' : '#475569',
+                              border: `1px solid ${selectedProduct.paidBy === 'amjad' ? '#bfdbfe' : selectedProduct.paidBy === 'nour' ? '#fbcfe8' : '#cbd5e1'}`,
+                              fontWeight: 800,
+                              fontSize: '0.75rem',
+                              padding: '0.2rem 0.5rem'
+                            }}>
+                              {selectedProduct.paidBy === 'amjad' ? 'أمجد (رسلان)' : selectedProduct.paidBy === 'nour' ? 'نور' : 'صندوق الشركة'}
+                            </span>
+                          </div>
+                        </div>
+
                         {parseFloat(quantity) > selectedProduct.quantity && (
-                          <span style={{ color: '#dc2626', fontWeight: 800 }}>
-                            ⚠️ الكمية المطلوبة أكبر من المتوفر بالمخزن!
-                          </span>
+                          <div style={{ color: '#dc2626', fontWeight: 800, fontSize: '0.8rem', marginTop: '0.45rem' }}>
+                            ⚠️ الكمية المطلوبة ({quantity}) أكبر من المتوفر حالياً بالمخزن ({selectedProduct.quantity})!
+                          </div>
                         )}
                       </div>
                     )}
@@ -1541,78 +1701,236 @@ export const SalesView: React.FC<SalesViewProps> = ({ initialSource, modalTrigge
                   </div>
                 )}
 
-                {/* 5. Quantity, Price, & Editable Live Total (Bidirectional Smart Calculation) */}
-                <div style={{ padding: '1.1rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--border-color)', marginBottom: '1.25rem' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem', alignItems: 'flex-start' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label" style={{ fontWeight: 800 }}>الكمية (العدد) *</label>
-                      <input 
-                        type="number" 
-                        min="0.001" 
-                        step="any"
-                        className="form-input" 
-                        required 
-                        value={quantity} 
-                        onChange={(e) => handleQuantityChange(e.target.value)}
-                        style={{ textAlign: 'center', fontWeight: 800, fontSize: '1rem' }}
-                      />
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                        عدد القطع أو الوحدات
+                {/* 5. Quantity, Price, Capital Cost, & Profit Calculation (Bidirectional Smart Calculation) */}
+                <div style={{ padding: '1.15rem', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--border-color)', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span>💰</span> تسعير العملية وتكلفة رأس المال والأرباح:
+                    </span>
+                    {selectedProduct && (
+                      <span className="badge" style={{ backgroundColor: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', fontSize: '0.75rem', fontWeight: 700 }}>
+                        ✨ تم تعبئة تكلفة رأس المال وسعر البيع من المخزن تلقائياً
                       </span>
+                    )}
+                  </div>
+
+                  {/* Section A: Customer Sale Pricing */}
+                  <div style={{
+                    padding: '0.85rem',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    marginBottom: '0.75rem'
+                  }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#2563eb', marginBottom: '0.55rem' }}>
+                      🏷️ بيانات سعر البيع للزبون:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', alignItems: 'flex-start' }}>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontWeight: 800 }}>الكمية (العدد) *</label>
+                        <input 
+                          type="number" 
+                          min="0.001" 
+                          step="any"
+                          className="form-input" 
+                          required 
+                          value={quantity} 
+                          onChange={(e) => handleQuantityChange(e.target.value)}
+                          style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.05rem' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                          عدد القطع أو الوحدات
+                        </span>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontWeight: 800 }}>سعر البيع الفردي ({currSym}) *</label>
+                        <input 
+                          type="number" 
+                          step="any" 
+                          min="0"
+                          className="form-input" 
+                          placeholder="0.00"
+                          value={unitPrice} 
+                          onChange={(e) => handleUnitPriceChange(e.target.value)}
+                          style={{ fontWeight: 800, fontSize: '1.05rem' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                          سعر بيع القطعة للزبون
+                        </span>
+                      </div>
+
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
+                          المبلغ الإجمالي النهائي ({currSym}) *
+                        </label>
+                        <input 
+                          type="number" 
+                          step="any" 
+                          min="0"
+                          className="form-input" 
+                          placeholder="0.00"
+                          value={totalAmountInput} 
+                          onChange={(e) => handleTotalAmountChange(e.target.value)}
+                          style={{ 
+                            fontWeight: 900, 
+                            color: 'var(--primary-color)', 
+                            fontSize: '1.15rem', 
+                            backgroundColor: '#eff6ff', 
+                            borderColor: '#93c5fd',
+                            boxShadow: '0 1px 3px rgba(37,99,235,0.08)'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 700, marginTop: '0.25rem', display: 'block' }}>
+                          إجمالي قيمة البيع المحصلة
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section B: Capital Cost & Profit Breakdown */}
+                  <div style={{
+                    padding: '0.85rem',
+                    backgroundColor: '#fffbeb',
+                    borderRadius: '8px',
+                    border: '1.5px solid #fef3c7',
+                    marginBottom: '0.75rem'
+                  }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#92400e', marginBottom: '0.55rem' }}>
+                      💼 تكلفة رأس المال وصافي الأرباح:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.85rem', alignItems: 'flex-start' }}>
+                      {/* Cost per unit */}
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>💼 تكلفة رأس المال للقطعة ({currSym})</span>
+                        </label>
+                        <input 
+                          type="number" 
+                          step="any" 
+                          min="0"
+                          className="form-input" 
+                          placeholder="0.00"
+                          value={costPrice} 
+                          onChange={(e) => handleCostPriceChange(e.target.value)}
+                          style={{ fontWeight: 800, fontSize: '1.05rem', color: '#92400e', backgroundColor: '#ffffff', borderColor: '#fde68a' }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: '#b45309', marginTop: '0.25rem', display: 'block' }}>
+                          سعر الشراء / التكلفة الأصلية للوحدة
+                        </span>
+                      </div>
+
+                      {/* Total capital cost */}
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>💼 إجمالي تكلفة رأس المال ({currSym})</span>
+                        </label>
+                        <input 
+                          type="number" 
+                          step="any" 
+                          min="0"
+                          className="form-input" 
+                          placeholder="0.00"
+                          value={totalCostInput} 
+                          onChange={(e) => handleTotalCostChange(e.target.value)}
+                          style={{ 
+                            fontWeight: 900, 
+                            color: '#92400e', 
+                            fontSize: '1.05rem', 
+                            backgroundColor: '#fef3c7', 
+                            borderColor: '#fcd34d' 
+                          }}
+                        />
+                        <span style={{ fontSize: '0.72rem', color: '#b45309', fontWeight: 700, marginTop: '0.25rem', display: 'block' }}>
+                          مجموع رأس المال المستثمر بالكمية
+                        </span>
+                      </div>
+
+                      {/* Net Profit Display */}
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label" style={{ fontWeight: 800, color: currentProfitNum >= 0 ? '#15803d' : '#b91c1c', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <span>📈 صافي الربح المتوقع ({currSym})</span>
+                        </label>
+                        <div style={{
+                          padding: '0.55rem 0.75rem',
+                          backgroundColor: currentProfitNum >= 0 ? '#f0fdf4' : '#fef2f2',
+                          border: `1.5px solid ${currentProfitNum >= 0 ? '#86efac' : '#fca5a5'}`,
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          minHeight: '44px'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontWeight: 900, fontSize: '1.15rem', color: currentProfitNum >= 0 ? '#15803d' : '#dc2626' }}>
+                              {currentProfitNum >= 0 ? '+' : ''}{currSym} {currentProfitNum.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
+                            </span>
+                            {currentTotalNum > 0 && currentTotalCostNum > 0 && (
+                              <span className="badge" style={{
+                                backgroundColor: currentProfitNum >= 0 ? '#dcfce7' : '#fee2e2',
+                                color: currentProfitNum >= 0 ? '#166534' : '#991b1b',
+                                fontWeight: 800,
+                                fontSize: '0.75rem'
+                              }}>
+                                {Math.round(currentProfitMargin)}% ربح
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: currentProfitNum >= 0 ? '#15803d' : '#b91c1c', fontWeight: 700, marginTop: '0.25rem', display: 'block' }}>
+                          {currentProfitNum >= 0 ? 'صافي الربح بعد استرداد رأس المال' : '⚠️ خسارة: البيع أقل من رأس المال!'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Section C: Live Financial Synthesis & Payer Attribution */}
+                  <div style={{
+                    padding: '0.75rem 1rem',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+                      <div>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>إجمالي الإيراد (البيع):</span>
+                        <strong style={{ color: '#2563eb', fontSize: '0.95rem' }}>{currSym} {currentTotalNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong>
+                      </div>
+                      <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '1.25rem' }}>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>تكلفة رأس المال المسترد:</span>
+                        <strong style={{ color: '#92400e', fontSize: '0.95rem' }}>{currSym} {currentTotalCostNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong>
+                      </div>
+                      <div style={{ borderRight: '1px solid #e2e8f0', paddingRight: '1.25rem' }}>
+                        <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.72rem' }}>صافي الأرباح:</span>
+                        <strong style={{ color: currentProfitNum >= 0 ? '#15803d' : '#dc2626', fontSize: '1rem', fontWeight: 900 }}>
+                          {currentProfitNum >= 0 ? '+' : ''}{currSym} {currentProfitNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        </strong>
+                      </div>
                     </div>
 
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label" style={{ fontWeight: 800 }}>السعر الفردي ({currSym})</label>
-                      <input 
-                        type="number" 
-                        step="any" 
-                        min="0"
-                        className="form-input" 
-                        placeholder="0.00"
-                        value={unitPrice} 
-                        onChange={(e) => handleUnitPriceChange(e.target.value)}
-                        style={{ fontWeight: 800, fontSize: '1rem' }}
-                      />
-                      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                        سعر القطعة الواحدة
-                      </span>
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label" style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
-                        المبلغ الإجمالي النهائي ({currSym}) *
-                      </label>
-                      <input 
-                        type="number" 
-                        step="any" 
-                        min="0"
-                        className="form-input" 
-                        placeholder="0.00"
-                        value={totalAmountInput} 
-                        onChange={(e) => handleTotalAmountChange(e.target.value)}
-                        style={{ 
-                          fontWeight: 900, 
-                          color: 'var(--primary-color)', 
-                          fontSize: '1.15rem', 
-                          backgroundColor: '#eff6ff', 
-                          borderColor: '#93c5fd',
-                          boxShadow: '0 1px 3px rgba(37,99,235,0.08)'
-                        }}
-                      />
-                      <span style={{ fontSize: '0.72rem', color: '#1d4ed8', fontWeight: 700, marginTop: '0.25rem', display: 'block' }}>
-                        قيمة العملية الإجمالية
-                      </span>
-                    </div>
+                    {selectedProduct && selectedProduct.paidBy && (
+                      <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: '#f8fafc', padding: '0.35rem 0.65rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                        <span>👤 ممول رأس المال:</span>
+                        <strong style={{ color: selectedProduct.paidBy === 'amjad' ? '#1d4ed8' : selectedProduct.paidBy === 'nour' ? '#be185d' : '#047857' }}>
+                          {selectedProduct.paidBy === 'amjad' ? 'أمجد (رسلان ليزر)' : selectedProduct.paidBy === 'nour' ? 'نور' : 'صندوق الشركة'}
+                        </strong>
+                      </div>
+                    )}
                   </div>
 
                   {/* Smart helper banner */}
                   <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', backgroundColor: '#f0fdf4', borderRadius: 'var(--radius-sm)', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', fontSize: '0.78rem' }}>
                     <span style={{ color: '#166534', fontWeight: 600 }}>
-                      💡 <strong>حساب ذكي وتلقائي:</strong> يمكنك كتابة <u>المبلغ الإجمالي</u> مع العدد وسيحسب النظام السعر الفردي تلقائياً، أو العكس تماماً!
+                      💡 <strong>حساب ذكي وتلقائي:</strong> يتم احتساب تكلفة رأس المال وصافي الربح ونسبة الهامش تلقائياً وفورياً مع تغيير الكمية أو الأسعار.
                     </span>
-                    {parseFloat(totalAmountInput) > 0 && (
+                    {currentTotalNum > 0 && (
                       <span style={{ fontWeight: 900, color: '#15803d', fontSize: '0.9rem' }}>
-                        المجموع: {currSym} {parseFloat(totalAmountInput).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                        إجمالي الفاتورة: {currSym} {currentTotalNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                       </span>
                     )}
                   </div>

@@ -144,6 +144,7 @@ export interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  costPrice?: number; // تكلفة رأس المال الفردية للقطعة
   taxRate: number; // percentage e.g. 15 or 0
   total: number;
   productionSource?: ProductionSource;
@@ -193,6 +194,10 @@ export interface Invoice {
   paidAmount: number;
   notes?: string;
   internalNotes?: string;
+  costPrice?: number; // تكلفة رأس المال الفردية للقطعة
+  totalCost?: number; // إجمالي تكلفة رأس المال للبضاعة/العملية
+  totalProfit?: number; // صافي ربح العملية
+  productPayer?: ExpensePayer; // من دفع تكلفة رأس المال للبضاعة (أمجد / نور / صندوق الشركة)
   externalSupplierName?: string;
   externalCost?: number;
   externalPaymentMethod?: 'cash' | 'bank' | 'sham_cash' | 'credit';
