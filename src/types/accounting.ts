@@ -117,11 +117,13 @@ export const getProductionSourceDetails = (source?: ProductionSource): Productio
   return PRODUCTION_SOURCES.find(s => s.id === source) || PRODUCTION_SOURCES[6];
 };
 
+export type AssetCategory = 'printers' | 'heat_press' | 'laser' | 'equipment' | 'leasehold' | 'vehicles' | 'other';
+
 export interface Asset {
   id: string;
   code: string;
   name: string;
-  category: 'printers' | 'heat_press' | 'laser' | 'equipment' | 'other';
+  category: AssetCategory;
   productionSourceKey?: ProductionSource; // 'dtf' | 'uv' | 'press' | 'general'
   purchasePrice: number;
   currency: Currency;

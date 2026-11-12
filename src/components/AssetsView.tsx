@@ -12,12 +12,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState<'all' | 'printers' | 'heat_press' | 'laser' | 'equipment' | 'other'>('all');
+  const [filterCategory, setFilterCategory] = useState<'all' | 'printers' | 'heat_press' | 'laser' | 'equipment' | 'leasehold' | 'vehicles' | 'other'>('all');
 
   // Form State
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [category, setCategory] = useState<'printers' | 'heat_press' | 'laser' | 'equipment' | 'other'>('printers');
+  const [category, setCategory] = useState<'printers' | 'heat_press' | 'laser' | 'equipment' | 'leasehold' | 'vehicles' | 'other'>('printers');
   const [productionSourceKey, setProductionSourceKey] = useState<ProductionSource>('dtf');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [currency, setCurrency] = useState<Currency>('USD');
@@ -419,28 +419,42 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
                 style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
                 onClick={() => setFilterCategory('printers')}
               >
-                🖨️ طابعات رقمية
+                🖨️ طابعات وماكينات ({assets.filter(a => a.category === 'printers').length})
               </button>
               <button 
                 className={`btn btn-sm ${filterCategory === 'heat_press' ? 'btn-primary' : 'btn-outline'}`}
                 style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
                 onClick={() => setFilterCategory('heat_press')}
               >
-                ♨️ مكابس حرارية
+                ♨️ مكابس حرارية ({assets.filter(a => a.category === 'heat_press').length})
               </button>
               <button 
                 className={`btn btn-sm ${filterCategory === 'laser' ? 'btn-primary' : 'btn-outline'}`}
                 style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
                 onClick={() => setFilterCategory('laser')}
               >
-                ⚡ ماكينات ليزر
+                ⚡ ليزر ({assets.filter(a => a.category === 'laser').length})
               </button>
               <button 
                 className={`btn btn-sm ${filterCategory === 'equipment' ? 'btn-primary' : 'btn-outline'}`}
                 style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
                 onClick={() => setFilterCategory('equipment')}
               >
-                ⚙️ أجهزة ومعدات
+                💻 كمبيوتر وتصميم ({assets.filter(a => a.category === 'equipment').length})
+              </button>
+              <button 
+                className={`btn btn-sm ${filterCategory === 'leasehold' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
+                onClick={() => setFilterCategory('leasehold')}
+              >
+                🏗️ سقيفة وتجهيزات المحل ({assets.filter(a => a.category === 'leasehold').length})
+              </button>
+              <button 
+                className={`btn btn-sm ${filterCategory === 'other' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem' }}
+                onClick={() => setFilterCategory('other')}
+              >
+                📦 أخرى ({assets.filter(a => a.category === 'other' || a.category === 'vehicles').length})
               </button>
             </div>
           </div>
@@ -501,9 +515,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className="badge badge-gray" style={{ fontSize: '0.75rem' }}>
-                          {ast.category === 'printers' ? '🖨️ طابعات' :
-                           ast.category === 'heat_press' ? '♨️ مكابس' :
-                           ast.category === 'equipment' ? '⚙️ معدات' : '📦 أخرى'}
+                          {ast.category === 'printers' ? '🖨️ طابعات وماكينات' :
+                           ast.category === 'heat_press' ? '♨️ مكابس حرارية' :
+                           ast.category === 'laser' ? '⚡ ماكينات ليزر' :
+                           ast.category === 'equipment' ? '💻 كمبيوتر وتقنية' :
+                           ast.category === 'leasehold' ? '🏗️ ديكور وسقيفة المحل' :
+                           ast.category === 'vehicles' ? '🚗 وسائل نقل' : '📦 أصول أخرى'}
                         </span>
                       </td>
                       <td style={{ fontSize: '0.85rem' }}>{ast.supplier || 'غير محدد'}</td>
@@ -612,10 +629,12 @@ export const AssetsView: React.FC<AssetsViewProps> = ({ onNavigateToSalesWithSou
                       value={category} 
                       onChange={(e) => setCategory(e.target.value as any)}
                     >
-                      <option value="printers">🖨️ طابعات رقمية ومكتبية (DTF / UV / عادية)</option>
+                      <option value="printers">🖨️ طابعات وماكينات إنتاجية (DTF / UV / عادية)</option>
                       <option value="laser">⚡ ماكينات ليزر وقص ونقش</option>
-                      <option value="heat_press">♨️ مكابس حرارية وتثبيت</option>
-                      <option value="equipment">⚙️ أجهزة ومعدات ورشة مساندة</option>
+                      <option value="heat_press">♨️ مكابس حرارية وتثبيت أقمشة</option>
+                      <option value="equipment">💻 أجهزة كمبيوتر وتصميم وشاشات وتقنية</option>
+                      <option value="leasehold">🏗️ تجهيزات وديكور وسقيفة وواجهة المحل</option>
+                      <option value="vehicles">🚗 وسائل نقل وسيارات</option>
                       <option value="other">📦 أصول ومعدات أخرى</option>
                     </select>
                   </div>

@@ -192,12 +192,25 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const parsed: Asset[] = JSON.parse(saved);
       const existingIds = new Set(parsed.map(a => a.id));
       const missing = initialAssets.filter(a => !existingIds.has(a.id));
-      if (missing.length > 0) {
-        const merged = [...parsed, ...missing];
+      const updatedExisting = parsed.map(p => {
+        const init = initialAssets.find(i => i.id === p.id);
+        if (init && (init.purchasePrice !== p.purchasePrice || init.category !== p.category || init.supplier !== p.supplier)) {
+          return { 
+            ...p, 
+            purchasePrice: init.purchasePrice, 
+            category: init.category, 
+            supplier: init.supplier, 
+            description: init.description, 
+            notes: init.notes 
+          };
+        }
+        return p;
+      });
+      const merged = [...updatedExisting, ...missing];
+      if (missing.length > 0 || JSON.stringify(merged) !== saved) {
         localStorage.setItem(`${STORAGE_KEY}_assets`, JSON.stringify(merged));
-        return merged;
       }
-      return parsed;
+      return merged;
     } catch {
       return initialAssets;
     }
