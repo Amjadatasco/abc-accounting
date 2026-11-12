@@ -814,9 +814,11 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const cloudAssets = (assetsRow?.data as Asset[]) || [];
       const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
       const extraLocalAssets = localAssets.filter(a => !cloudAssetIds.has(a.id));
+      const existingAllAssetIds = new Set([...cloudAssetIds, ...localAssets.map(a => a.id)]);
+      const missingInitialAssets = initialAssets.filter(a => !existingAllAssetIds.has(a.id));
+      const mergedAst = [...cloudAssets, ...extraLocalAssets, ...missingInitialAssets];
 
-      if (extraLocalAssets.length > 0) {
-        const mergedAst = [...cloudAssets, ...extraLocalAssets];
+      if (extraLocalAssets.length > 0 || missingInitialAssets.length > 0) {
         await client.from('accounting_settings').upsert({
           id: 'fixed_assets',
           data: mergedAst,
