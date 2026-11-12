@@ -26,6 +26,8 @@ export const initialAccounts: Account[] = [
   { id: 'acc_1210', code: '1210', name: 'آلات وطابعات ومكابس وماكينات ليزر', category: 'asset', type: 'debit', balance: 0, parentId: 'acc_1200' },
   { id: 'acc_1220', code: '1220', name: 'وسائل النقل والسيارات', category: 'asset', type: 'debit', balance: 0, parentId: 'acc_1200' },
   { id: 'acc_1230', code: '1230', name: 'أجهزة الكمبيوتر وشاشات التصميم', category: 'asset', type: 'debit', balance: 0, parentId: 'acc_1200' },
+  { id: 'acc_1240', code: '1240', name: 'تجهيزات وديكور المحل والسقيفة والواجهة', category: 'asset', type: 'debit', balance: 0, parentId: 'acc_1200' },
+  { id: 'acc_1250', code: '1250', name: 'أثاث ومفروشات ومكيفات وتجهيزات كهربائية', category: 'asset', type: 'debit', balance: 0, parentId: 'acc_1200' },
 
   // 2000 - الخصوم (Liabilities)
   { id: 'acc_2000', code: '2000', name: 'الخصوم', category: 'liability', type: 'credit', balance: 0, isSystem: true },

@@ -3,7 +3,7 @@ import { useAccounting } from '../context/AccountingContext';
 import type { Currency, ExpensePayer, ExpenseBill } from '../types/accounting';
 
 export const ExpensesView: React.FC = () => {
-  const { expenses, accounts, contacts, addExpense, updateExpense, deleteExpense, addContact, addAccount } = useAccounting();
+  const { expenses, accounts, contacts, addExpense, updateExpense, deleteExpense, addContact, addAccount, addAsset } = useAccounting();
 
   // Sub-pages / Tabs
   const [activeTab, setActiveTab] = useState<'all' | 'abc' | 'amjad' | 'nour' | 'reconciliation'>('all');
@@ -26,6 +26,9 @@ export const ExpensesView: React.FC = () => {
   const [accountId, setAccountId] = useState('');
   const [isCustomAccount, setIsCustomAccount] = useState(false);
   const [customAccountName, setCustomAccountName] = useState('');
+  const [customAccountCategory, setCustomAccountCategory] = useState<'expense' | 'asset'>('expense');
+  const [autoAddToAssets, setAutoAddToAssets] = useState(true);
+  const [assetCustomName, setAssetCustomName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState('');
   const [taxAmount, setTaxAmount] = useState('0');
@@ -33,8 +36,14 @@ export const ExpensesView: React.FC = () => {
   const [status, setStatus] = useState<'paid' | 'unpaid'>('paid');
   const [notes, setNotes] = useState('');
 
+  const assetAccounts = accounts.filter(a => a.category === 'asset' && (a.code.startsWith('12') || a.parentId === 'acc_1200' || a.id === 'acc_1200'));
   const expenseAccounts = accounts.filter(a => a.category === 'expense');
   const vendors = contacts.filter(c => c.type === 'vendor' || c.type === 'both');
+
+  const selectedAccount = accounts.find(a => a.id === (isCustomAccount ? '' : accountId));
+  const isAssetAccount = selectedAccount 
+    ? (selectedAccount.category === 'asset' || selectedAccount.code.startsWith('12')) 
+    : (isCustomAccount && customAccountCategory === 'asset');
 
   const currentRateNum = parseFloat(exchangeRate) || 14800;
   const currentAmountNum = parseFloat(amount) || 0;
@@ -48,7 +57,7 @@ export const ExpensesView: React.FC = () => {
     if (isCustomAccount) {
       const trimmedCustomName = customAccountName.trim();
       if (!trimmedCustomName) {
-        alert('يرجى كتابة اسم بند المصروف الجديد.');
+        alert('يرجى كتابة اسم البند الجديد.');
         return;
       }
 
@@ -57,33 +66,58 @@ export const ExpensesView: React.FC = () => {
       if (existingAcc) {
         finalAccountId = existingAcc.id;
       } else {
-        // Calculate next code for expense category (e.g. 5610, 5620, etc.)
-        const expCodes = accounts
-          .filter(a => a.category === 'expense')
-          .map(a => parseInt(a.code) || 0)
-          .filter(c => c >= 5000 && c < 6000);
-        const maxCode = expCodes.length > 0 ? Math.max(...expCodes) : 5600;
-        const nextCode = String(maxCode + 10);
-        const newAccId = `acc_${Date.now()}`;
+        if (customAccountCategory === 'asset') {
+          // Generate code for asset category (1240, 1250, etc.)
+          const assetCodes = accounts
+            .filter(a => a.category === 'asset' && a.code.startsWith('12'))
+            .map(a => parseInt(a.code) || 0)
+            .filter(c => c >= 1200 && c < 1300);
+          const maxCode = assetCodes.length > 0 ? Math.max(...assetCodes) : 1230;
+          const nextCode = String(maxCode + 10);
+          const newAccId = `acc_${Date.now()}`;
 
-        const newAccount = {
-          id: newAccId,
-          code: nextCode,
-          name: trimmedCustomName,
-          category: 'expense' as const,
-          type: 'debit' as const,
-          balance: 0,
-          parentId: 'acc_5000',
-          isSystem: false
-        };
+          const newAccount = {
+            id: newAccId,
+            code: nextCode,
+            name: trimmedCustomName,
+            category: 'asset' as const,
+            type: 'debit' as const,
+            balance: 0,
+            parentId: 'acc_1200',
+            isSystem: false
+          };
 
-        const createdAcc = addAccount(newAccount);
-        finalAccountId = createdAcc.id;
+          const createdAcc = addAccount(newAccount);
+          finalAccountId = createdAcc.id;
+        } else {
+          // Calculate next code for expense category (5610, 5620, etc.)
+          const expCodes = accounts
+            .filter(a => a.category === 'expense')
+            .map(a => parseInt(a.code) || 0)
+            .filter(c => c >= 5000 && c < 6000);
+          const maxCode = expCodes.length > 0 ? Math.max(...expCodes) : 5600;
+          const nextCode = String(maxCode + 10);
+          const newAccId = `acc_${Date.now()}`;
+
+          const newAccount = {
+            id: newAccId,
+            code: nextCode,
+            name: trimmedCustomName,
+            category: 'expense' as const,
+            type: 'debit' as const,
+            balance: 0,
+            parentId: 'acc_5000',
+            isSystem: false
+          };
+
+          const createdAcc = addAccount(newAccount);
+          finalAccountId = createdAcc.id;
+        }
       }
     }
 
     if (!finalAccountId || !amount || !nameTrimmed) {
-      alert('يرجى تحديد اسم المورد، وحساب المصروف، والمبلغ.');
+      alert('يرجى تحديد اسم المورد، وحساب المصروف أو الأصل، والمبلغ.');
       return;
     }
 
@@ -106,6 +140,8 @@ export const ExpensesView: React.FC = () => {
       ? finalAmount * finalRate
       : finalRate > 0 ? finalAmount / finalRate : 0;
 
+    let assignedBillNumber = editingExpense?.billNumber || '';
+
     if (editingExpense) {
       updateExpense({
         ...editingExpense,
@@ -125,9 +161,9 @@ export const ExpensesView: React.FC = () => {
         notes
       });
     } else {
-      const billNumber = `EXP-2026-${String(expenses.length + 1).padStart(3, '0')}`;
+      assignedBillNumber = `EXP-2026-${String(expenses.length + 1).padStart(3, '0')}`;
       addExpense({
-        billNumber,
+        billNumber: assignedBillNumber,
         vendorId: finalVendorId,
         vendorName: nameTrimmed,
         accountId: finalAccountId,
@@ -143,6 +179,56 @@ export const ExpensesView: React.FC = () => {
         status,
         notes
       });
+
+      // Automatically register to Assets (الأصول والماكينات) if it's an Asset account and requested
+      if (isAssetAccount && autoAddToAssets) {
+        const lower = `${nameTrimmed} ${notes} ${customAccountName}`.toLowerCase();
+        let cat: 'printers' | 'heat_press' | 'laser' | 'equipment' | 'other' = 'other';
+        let pKey: any = undefined;
+
+        if (lower.includes('dtf') || lower.includes('ديتياف') || lower.includes('يونيفورم')) {
+          cat = 'printers';
+          pKey = 'dtf';
+        } else if (lower.includes('uv') || lower.includes('يوفي')) {
+          cat = 'printers';
+          pKey = 'uv';
+        } else if (lower.includes('طابعة') || lower.includes('طابعه') || lower.includes('printer')) {
+          cat = 'printers';
+          pKey = 'regular_print';
+        } else if (lower.includes('مكبس') || lower.includes('حراري') || lower.includes('press')) {
+          cat = 'heat_press';
+          pKey = 'press';
+        } else if (lower.includes('ليزر') || lower.includes('laser')) {
+          cat = 'laser';
+          pKey = 'laser';
+        } else if (lower.includes('لابتوب') || lower.includes('كمبيوتر') || lower.includes('شاشة') || lower.includes('laptop') || lower.includes('pc')) {
+          cat = 'equipment';
+        } else if (lower.includes('سقيفة') || lower.includes('واجهة') || lower.includes('ديكور') || lower.includes('سحاب') || lower.includes('محل')) {
+          cat = 'other';
+        } else {
+          cat = 'equipment';
+        }
+
+        const effectiveAssetName = assetCustomName.trim() || notes.trim() || nameTrimmed || 'أصل جديد';
+
+        addAsset({
+          name: effectiveAssetName,
+          code: `AST-${Date.now().toString().slice(-4)}`,
+          category: cat,
+          productionSourceKey: pKey,
+          purchasePrice: finalAmount,
+          currency: expenseCurrency,
+          currencySymbol: expCurrSym,
+          purchaseDate: date,
+          supplier: nameTrimmed,
+          invoiceRef: assignedBillNumber,
+          status: 'active',
+          description: notes.trim() 
+            ? `${notes.trim()} (سند صرف: ${assignedBillNumber})` 
+            : `${effectiveAssetName} - تم شراؤه بواسطة: ${paidBy === 'amjad' ? 'أمجد' : paidBy === 'nour' ? 'نور' : 'الشركة'}`,
+          notes: `تم إدراجه تلقائياً في قائمة الأصول من سند المصروف ${assignedBillNumber} - الدافع: ${paidBy === 'amjad' ? 'أمجد' : paidBy === 'nour' ? 'نور' : 'خزينة ABC'}`
+        });
+      }
     }
 
     localStorage.setItem('last_dollar_rate', String(finalRate));
@@ -155,6 +241,9 @@ export const ExpensesView: React.FC = () => {
     setAccountId('');
     setIsCustomAccount(false);
     setCustomAccountName('');
+    setCustomAccountCategory('expense');
+    setAutoAddToAssets(true);
+    setAssetCustomName('');
     setAmount('');
     setTaxAmount('0');
     setNotes('');
@@ -252,11 +341,15 @@ export const ExpensesView: React.FC = () => {
 
   // Category Breakdown configuration and active accounts
   const categoryConfig: { [key: string]: { icon: string; shortName: string; color: string; border: string; bg: string } } = {
-    'acc_5430': { icon: '🏗️', shortName: 'ديكور وتجهيزات الورشة', color: '#0284c7', border: '#bae6fd', bg: '#f0f9ff' },
-    'acc_5410': { icon: '⚡', shortName: 'كهرباء وتمديدات طاقة', color: '#d97706', border: '#fde68a', bg: '#fffbeb' },
+    'acc_5430': { icon: '🏗️', shortName: 'ديكور وصيانة وتشغيل', color: '#0284c7', border: '#bae6fd', bg: '#f0f9ff' },
+    'acc_5410': { icon: '⚡', shortName: 'كهرباء وساعات طاقة', color: '#d97706', border: '#fde68a', bg: '#fffbeb' },
     'acc_5700': { icon: '🚚', shortName: 'شحن ونقل وتنزيل ماكينات', color: '#059669', border: '#a7f3d0', bg: '#f0fdf4' },
+    'acc_1200': { icon: '🏢', shortName: 'أصول ثابتة عامة', color: '#7c3aed', border: '#ddd6fe', bg: '#faf5ff' },
     'acc_1210': { icon: '🖨️', shortName: 'آلات وماكينات (أصول)', color: '#7c3aed', border: '#ddd6fe', bg: '#faf5ff' },
+    'acc_1220': { icon: '🚗', shortName: 'وسائل النقل والسيارات', color: '#0284c7', border: '#bae6fd', bg: '#f0f9ff' },
     'acc_1230': { icon: '💻', shortName: 'أجهزة كمبيوتر وتقنية', color: '#4f46e5', border: '#c7d2fe', bg: '#eef2ff' },
+    'acc_1240': { icon: '🏗️', shortName: 'سقيفة وديكور رأسمالي', color: '#b45309', border: '#fde68a', bg: '#fffbeb' },
+    'acc_1250': { icon: '🛋️', shortName: 'أثاث وتجهيزات كهربائية', color: '#0d9488', border: '#99f6e4', bg: '#f0fdfa' },
     'acc_5110': { icon: '🎨', shortName: 'أحبار ومواد طباعة', color: '#dc2626', border: '#fecaca', bg: '#fef2f2' },
     'acc_5600': { icon: '☕', shortName: 'ضيافة ونظافة ونثريات', color: '#475569', border: '#cbd5e1', bg: '#f8fafc' },
   };
@@ -345,6 +438,9 @@ export const ExpensesView: React.FC = () => {
     setAccountId('');
     setIsCustomAccount(false);
     setCustomAccountName('');
+    setCustomAccountCategory('expense');
+    setAutoAddToAssets(true);
+    setAssetCustomName('');
     setDate(new Date().toISOString().split('T')[0]);
     setAmount('');
     setTaxAmount('0');
@@ -362,6 +458,9 @@ export const ExpensesView: React.FC = () => {
     setAccountId(exp.accountId || '');
     setIsCustomAccount(false);
     setCustomAccountName('');
+    setCustomAccountCategory('expense');
+    setAutoAddToAssets(false);
+    setAssetCustomName('');
     setDate(exp.date || new Date().toISOString().split('T')[0]);
     setAmount(String(exp.amount || ''));
     setTaxAmount(String(exp.taxAmount || 0));
@@ -1431,7 +1530,9 @@ export const ExpensesView: React.FC = () => {
                 <div className="form-row">
                   <div className="form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>بند المصروف (من شجرة الحسابات) *</label>
+                      <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
+                        بند الحساب (أصول أو مصروفات من الشجرة) *
+                      </label>
                       {!isCustomAccount && (
                         <button 
                           type="button" 
@@ -1465,17 +1566,72 @@ export const ExpensesView: React.FC = () => {
                         } else {
                           setIsCustomAccount(false);
                           setAccountId(e.target.value);
+                          const acc = accounts.find(a => a.id === e.target.value);
+                          if (acc && (acc.category === 'asset' || acc.code.startsWith('12'))) {
+                            setAutoAddToAssets(true);
+                          }
                         }
                       }}
                     >
-                      <option value="">-- اختر حساب المصروف --</option>
-                      {expenseAccounts.map(a => (
-                        <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
-                      ))}
+                      <option value="">-- اختر الحساب (أصل ثابت أو مصروف) --</option>
+                      <optgroup label="🏢 الأصول الثابتة والماكينات والتجهيزات (1200)">
+                        {assetAccounts.map(a => (
+                          <option key={a.id} value={a.id}>🏢 {a.code} - {a.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="📋 المصروفات التشغيلية واليومية (5000)">
+                        {expenseAccounts.map(a => (
+                          <option key={a.id} value={a.id}>{a.code} - {a.name}</option>
+                        ))}
+                      </optgroup>
                       <option value="__other__" style={{ fontWeight: 800, color: '#166534', backgroundColor: '#f0fdf4' }}>
-                        ✨ + أخرى (كتابة بند مصروف جديد وحفظه دائماً)...
+                        ✨ + أخرى (كتابة بند جديد في الشجرة وحفظه دائماً)...
                       </option>
                     </select>
+
+                    {/* Asset automatic sync box when an asset account is selected */}
+                    {isAssetAccount && !isCustomAccount && (
+                      <div style={{
+                        marginTop: '0.65rem',
+                        padding: '0.75rem 0.9rem',
+                        backgroundColor: '#f5f3ff',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1.5px solid #c4b5fd'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', margin: 0 }}>
+                            <input 
+                              type="checkbox" 
+                              checked={autoAddToAssets} 
+                              onChange={(e) => setAutoAddToAssets(e.target.checked)} 
+                              style={{ width: '16px', height: '16px', accentColor: '#7c3aed' }}
+                            />
+                            <span style={{ fontWeight: 800, fontSize: '0.84rem', color: '#6d28d9' }}>
+                              📦 إدراج هذا الأصل تلقائياً في قائمة الأصول والماكينات (Assets)
+                            </span>
+                          </label>
+                          <span className="badge" style={{ backgroundColor: '#ede9fe', color: '#6d28d9', fontSize: '0.72rem', border: '1px solid #c4b5fd' }}>
+                            أصل رأسمالي
+                          </span>
+                        </div>
+
+                        {autoAddToAssets && (
+                          <div style={{ marginTop: '0.5rem' }}>
+                            <input 
+                              type="text" 
+                              className="form-input" 
+                              placeholder="اسم الأصل في قائمة الماكينات (اتركه فارغاً لاعتماد اسم البيان/المورد تلقائياً)" 
+                              value={assetCustomName} 
+                              onChange={(e) => setAssetCustomName(e.target.value)} 
+                              style={{ fontSize: '0.8rem', backgroundColor: 'white', borderColor: '#c4b5fd' }}
+                            />
+                            <span style={{ fontSize: '0.73rem', color: '#6d28d9', marginTop: '0.3rem', display: 'block' }}>
+                              ✨ يُسجل المبلغ في جرد وتصفية الشركاء، وينتقل الأصل مباشرة لصفحة الأصول لمتابعة قيمته وإنتاجيته.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {isCustomAccount && (
                       <div style={{
@@ -1485,9 +1641,9 @@ export const ExpensesView: React.FC = () => {
                         borderRadius: 'var(--radius-sm)',
                         border: '1.5px solid #86efac'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem' }}>
                           <label style={{ fontWeight: 800, fontSize: '0.86rem', color: '#166534', margin: 0 }}>
-                            ✏️ اسم بند المصروف الجديد *
+                            ✏️ تصنيف واسم البند الجديد *
                           </label>
                           <button 
                             type="button" 
@@ -1497,18 +1653,74 @@ export const ExpensesView: React.FC = () => {
                             العودة للقائمة المعتمدة
                           </button>
                         </div>
+
+                        {/* Account Category Selector (Asset vs Expense) */}
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <label style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.55rem',
+                            backgroundColor: customAccountCategory === 'asset' ? '#ede9fe' : 'white',
+                            border: `1.5px solid ${customAccountCategory === 'asset' ? '#7c3aed' : '#cbd5e1'}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.79rem',
+                            fontWeight: 700,
+                            color: customAccountCategory === 'asset' ? '#6d28d9' : '#475569'
+                          }}>
+                            <input 
+                              type="radio" 
+                              name="customAccountCategory" 
+                              value="asset" 
+                              checked={customAccountCategory === 'asset'} 
+                              onChange={() => { setCustomAccountCategory('asset'); setAutoAddToAssets(true); }} 
+                              style={{ accentColor: '#7c3aed' }}
+                            />
+                            <span>🏢 أصل ثابت (ماكينة، جهاز، ديكور)</span>
+                          </label>
+
+                          <label style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.35rem 0.55rem',
+                            backgroundColor: customAccountCategory === 'expense' ? '#f0fdf4' : 'white',
+                            border: `1.5px solid ${customAccountCategory === 'expense' ? '#16a34a' : '#cbd5e1'}`,
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontSize: '0.79rem',
+                            fontWeight: 700,
+                            color: customAccountCategory === 'expense' ? '#166534' : '#475569'
+                          }}>
+                            <input 
+                              type="radio" 
+                              name="customAccountCategory" 
+                              value="expense" 
+                              checked={customAccountCategory === 'expense'} 
+                              onChange={() => { setCustomAccountCategory('expense'); setAutoAddToAssets(false); }} 
+                              style={{ accentColor: '#16a34a' }}
+                            />
+                            <span>📋 مصروف تشغيلي (استهلاكي/دوري)</span>
+                          </label>
+                        </div>
+
                         <input 
                           type="text" 
                           className="form-input" 
                           required={isCustomAccount}
-                          placeholder="اكتب اسم البند (مثال: صيانة سيارة، ترخيص، محروقات، سفر...)" 
+                          placeholder={customAccountCategory === 'asset' ? "اسم الأصل (مثال: ماكينة تغليف حراري، كمبيوتر تصميم، راوتر...)" : "اسم المصروف (مثال: صيانة سيارة، ترخيص، محروقات، سفر...)"} 
                           value={customAccountName} 
                           onChange={(e) => setCustomAccountName(e.target.value)} 
-                          style={{ backgroundColor: 'white', borderColor: '#86efac', fontWeight: 600 }}
+                          style={{ backgroundColor: 'white', borderColor: customAccountCategory === 'asset' ? '#c4b5fd' : '#86efac', fontWeight: 600 }}
                           autoFocus
                         />
-                        <span style={{ fontSize: '0.74rem', color: '#15803d', marginTop: '0.3rem', display: 'block' }}>
-                          ✨ سيتم حفظ هذا البند تلقائياً في شجرة الحسابات وقائمة المصروفات وسيبقى متاحاً دائماً في القائمة.
+                        <span style={{ fontSize: '0.74rem', color: customAccountCategory === 'asset' ? '#6d28d9' : '#15803d', marginTop: '0.3rem', display: 'block' }}>
+                          {customAccountCategory === 'asset'
+                            ? '✨ سيُحفظ في الشجرة تحت (1200 - الأصول الثابتة) وينتقل الأصل مباشرة لقائمة الأصول والماكينات.'
+                            : '✨ سيُحفظ في الشجرة تحت (5000 - المصروفات التشغيلية) ويبقى متاحاً دائماً في القائمة.'}
                         </span>
                       </div>
                     )}
