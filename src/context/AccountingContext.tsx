@@ -10,7 +10,8 @@ import type {
   Product,
   Asset,
   Quotation,
-  InvoiceItem
+  InvoiceItem,
+  ExpensePayer
 } from '../types/accounting';
 import { 
   initialAccounts, 
@@ -75,6 +76,7 @@ interface AccountingContextType {
   deleteContact: (id: string) => void;
   addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => void;
   updateProduct: (product: Product) => void;
+  updateProductPayer: (productId: string, paidBy: ExpensePayer) => void;
   deleteProduct: (id: string) => void;
   adjustProductStock: (productId: string, deltaQuantity: number, reason?: string) => void;
   addAsset: (asset: Omit<Asset, 'id' | 'createdAt'>) => void;
@@ -145,8 +147,9 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!saved) return initialExpenses;
     try {
       const parsed: ExpenseBill[] = JSON.parse(saved);
+      const cleanedExpenses = parsed.filter(e => e.id !== 'exp_raslan_01' && e.id !== 'exp_raslan_02');
       const initialMap = new Map(initialExpenses.map(e => [e.id, e]));
-      const updated = parsed.map(exp => {
+      const updated = cleanedExpenses.map(exp => {
         const init = initialMap.get(exp.id);
         if (init && (exp.accountId === 'acc_5600' || exp.accountId === 'acc_5400' || !exp.accountId) && init.accountId !== exp.accountId) {
           return { ...exp, accountId: init.accountId };
@@ -185,9 +188,17 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const parsed: Product[] = JSON.parse(saved);
       const cleaned = parsed.filter(p => !oldIds.has(p.id));
-      const existingIds = new Set(cleaned.map(p => p.id));
+      const initialMap = new Map(initialProducts.map(p => [p.id, p]));
+      const updatedExisting = cleaned.map(p => {
+        const init = initialMap.get(p.id);
+        if (init && !p.paidBy && init.paidBy) {
+          return { ...p, paidBy: init.paidBy };
+        }
+        return p;
+      });
+      const existingIds = new Set(updatedExisting.map(p => p.id));
       const missing = initialProducts.filter(p => !oldIds.has(p.id) && !existingIds.has(p.id));
-      const finalProducts = missing.length > 0 ? [...cleaned, ...missing] : cleaned;
+      const finalProducts = missing.length > 0 ? [...updatedExisting, ...missing] : updatedExisting;
       localStorage.setItem(`${STORAGE_KEY}_products`, JSON.stringify(finalProducts));
       return finalProducts;
     } catch {
@@ -995,6 +1006,14 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateProduct = (updatedProduct: Product) => {
     setProducts(prev => {
       const updated = prev.map(p => p.id === updatedProduct.id ? { ...updatedProduct, updatedAt: new Date().toISOString() } : p);
+      syncProductsToCloud(updated);
+      return updated;
+    });
+  };
+
+  const updateProductPayer = (productId: string, paidBy: ExpensePayer) => {
+    setProducts(prev => {
+      const updated = prev.map(p => p.id === productId ? { ...p, paidBy, updatedAt: new Date().toISOString() } : p);
       syncProductsToCloud(updated);
       return updated;
     });
@@ -1935,6 +1954,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       deleteContact,
       addProduct,
       updateProduct,
+      updateProductPayer,
       deleteProduct,
       adjustProductStock,
       addAsset,

@@ -866,49 +866,10 @@ export const initialExpenses: ExpenseBill[] = [
     notes: 'أحبار ماكينة DTF ألبسة: 2 عبوة أبيض ($70) + 1 أحمر ($35) + 1 أزرق ($35) + 1 أسود ($35) + 1 أصفر ($35) - إجمالي 6 عبوات من مطبعة الفؤاد',
     createdAt: '2026-09-08'
   },
-  // --- مشتريات بضائع ومواد خام ليزر رسلان (سددها الشريك أمجد من حسابه الخاص) ---
-  {
-    id: 'exp_raslan_01',
-    billNumber: 'EXP-2026-051',
-    vendorId: 'cnt_raslan_01',
-    vendorName: 'ليزر رسلان - لصناعة الستندات والديكورات',
-    accountId: 'acc_5140', // مشتريات بضائع ومواد خام للتصنيع وإعادة البيع
-    date: '2026-02-12',
-    amount: 14.1,
-    taxAmount: 0,
-    currency: 'USD',
-    currencySymbol: '$',
-    exchangeRate: 14800,
-    equivalentAmount: 208680,
-    paymentMethod: 'cash',
-    paidBy: 'amjad',
-    status: 'paid',
-    notes: 'إذن تسليم رقم 000340 من ليزر رسلان: بلكسي دائرة شفاف (1.5$) + بلكسي مستطيل شفاف 4 قطع (4.4$) + روماك فضي (1.2$) + لوح ذهبي كحلي (7$) - سدده أمجد من حسابه الخاص',
-    createdAt: '2026-02-12'
-  },
-  {
-    id: 'exp_raslan_02',
-    billNumber: 'EXP-2026-052',
-    vendorId: 'cnt_raslan_01',
-    vendorName: 'ليزر رسلان - لصناعة الستندات والديكورات',
-    accountId: 'acc_5140', // مشتريات بضائع ومواد خام للتصنيع وإعادة البيع
-    date: '2026-02-12',
-    amount: 19.6,
-    taxAmount: 0,
-    currency: 'USD',
-    currencySymbol: '$',
-    exchangeRate: 14800,
-    equivalentAmount: 290080,
-    paymentMethod: 'cash',
-    paidBy: 'amjad',
-    status: 'paid',
-    notes: 'إذن تسليم رقم 000341 من ليزر رسلان: شفاف 44*20 قطعتين (4.5$) + شفاف 20*20 عدد 7 قطع (7.7$) + حليبي 15*25 قطعتين (2.7$) + حليبي 15*20 قطعتين (1.4$) + حليبي 12.5*20 قطعة (0.9$) + فضي 20*20 قطعتين (2.4$) - سدده أمجد من حسابه الخاص',
-    createdAt: '2026-02-12'
-  },
   // --- مصاريف أثاث وتجهيزات المشغل والمحل (سددها الشريك نور حديثاً من حسابه الخاص) ---
   {
     id: 'exp_nour_usd_10',
-    billNumber: 'EXP-2026-053',
+    billNumber: 'EXP-2026-051',
     vendorName: 'مفروشات وتجهيزات مكتبية',
     accountId: 'acc_1250', // أثاث ومفروشات ومكيفات وتجهيزات كهربائية (أصول ثابتة)
     date: '2026-02-12',
@@ -926,7 +887,7 @@ export const initialExpenses: ExpenseBill[] = [
   },
   {
     id: 'exp_nour_usd_11',
-    billNumber: 'EXP-2026-054',
+    billNumber: 'EXP-2026-052',
     vendorName: 'مفروشات وتجهيزات مكتبية',
     accountId: 'acc_1250',
     date: '2026-02-12',
@@ -944,7 +905,7 @@ export const initialExpenses: ExpenseBill[] = [
   },
   {
     id: 'exp_nour_usd_12',
-    billNumber: 'EXP-2026-055',
+    billNumber: 'EXP-2026-053',
     vendorName: 'مفروشات وتجهيزات مكتبية',
     accountId: 'acc_1250',
     date: '2026-02-12',
@@ -962,7 +923,7 @@ export const initialExpenses: ExpenseBill[] = [
   },
   {
     id: 'exp_nour_usd_13',
-    billNumber: 'EXP-2026-056',
+    billNumber: 'EXP-2026-054',
     vendorName: 'تجهيزات مشغل وورشة',
     accountId: 'acc_1250',
     date: '2026-02-12',
@@ -980,7 +941,7 @@ export const initialExpenses: ExpenseBill[] = [
   },
   {
     id: 'exp_nour_usd_14',
-    billNumber: 'EXP-2026-057',
+    billNumber: 'EXP-2026-055',
     vendorName: 'تجهيزات مستودعات ورفوف',
     accountId: 'acc_1250',
     date: '2026-02-12',
@@ -998,7 +959,7 @@ export const initialExpenses: ExpenseBill[] = [
   },
   {
     id: 'exp_nour_usd_15',
-    billNumber: 'EXP-2026-058',
+    billNumber: 'EXP-2026-056',
     vendorName: 'أجهزة وتجهيزات كهربائية',
     accountId: 'acc_1250',
     date: '2026-02-12',
@@ -1226,10 +1187,10 @@ export const initialAssets: Asset[] = [
     currencySymbol: '$',
     purchaseDate: '2026-02-12',
     supplier: 'مفروشات وتجهيزات مكتبية',
-    invoiceRef: 'EXP-2026-053',
+    invoiceRef: 'EXP-2026-051',
     status: 'active',
     description: 'طاولات مكتب خشبية للعمل والإدارة والتصميم (عدد 3 طاولات × 20$ = 60$)',
-    notes: 'سند صرف رقم EXP-2026-053 - تم الدفع بواسطة: نور (60$)',
+    notes: 'سند صرف رقم EXP-2026-051 - تم الدفع بواسطة: نور (60$)',
     createdAt: '2026-02-12'
   },
   {
@@ -1242,10 +1203,10 @@ export const initialAssets: Asset[] = [
     currencySymbol: '$',
     purchaseDate: '2026-02-12',
     supplier: 'مفروشات وتجهيزات مكتبية',
-    invoiceRef: 'EXP-2026-054',
+    invoiceRef: 'EXP-2026-052',
     status: 'active',
     description: 'كراسي ثابتة لخدمة العملاء وصالة الانتظار والمكتب (عدد 4 كراسي × 15$ = 60$)',
-    notes: 'سند صرف رقم EXP-2026-054 - تم الدفع بواسطة: نور (60$)',
+    notes: 'سند صرف رقم EXP-2026-052 - تم الدفع بواسطة: نور (60$)',
     createdAt: '2026-02-12'
   },
   {
@@ -1258,10 +1219,10 @@ export const initialAssets: Asset[] = [
     currencySymbol: '$',
     purchaseDate: '2026-02-12',
     supplier: 'مفروشات وتجهيزات مكتبية',
-    invoiceRef: 'EXP-2026-055',
+    invoiceRef: 'EXP-2026-053',
     status: 'active',
     description: 'كراسي مكتبية متحركة بعجلات وهيدروليك لموظفي التصميم والطباعة (عدد 2 كرسي × 20$ = 40$)',
-    notes: 'سند صرف رقم EXP-2026-055 - تم الدفع بواسطة: نور (40$)',
+    notes: 'سند صرف رقم EXP-2026-053 - تم الدفع بواسطة: نور (40$)',
     createdAt: '2026-02-12'
   },
   {
@@ -1274,10 +1235,10 @@ export const initialAssets: Asset[] = [
     currencySymbol: '$',
     purchaseDate: '2026-02-12',
     supplier: 'تجهيزات مشغل وورشة',
-    invoiceRef: 'EXP-2026-056',
+    invoiceRef: 'EXP-2026-054',
     status: 'active',
     description: 'طاولة مشغل وورشة مخصصة للأعمال اليدوية والكبس الحراري والتجهيز والتجميع (قيمة: 30$)',
-    notes: 'سند صرف رقم EXP-2026-056 - تم الدفع بواسطة: نور (30$)',
+    notes: 'سند صرف رقم EXP-2026-054 - تم الدفع بواسطة: نور (30$)',
     createdAt: '2026-02-12'
   },
   {
@@ -1290,10 +1251,10 @@ export const initialAssets: Asset[] = [
     currencySymbol: '$',
     purchaseDate: '2026-02-12',
     supplier: 'تجهيزات مستودعات ورفوف',
-    invoiceRef: 'EXP-2026-057',
+    invoiceRef: 'EXP-2026-055',
     status: 'active',
     description: 'خزائن رفوف معدنية متينة لون أخضر لتخزين البضائع والمواد الخام ورولات ومطبوعات المشغل (عدد 2 خزانة × 100$ = 200$)',
-    notes: 'سند صرف رقم EXP-2026-057 - تم الدفع بواسطة: نور (200$)',
+    notes: 'سند صرف رقم EXP-2026-055 - تم الدفع بواسطة: نور (200$)',
     createdAt: '2026-02-12'
   },
   {
@@ -1306,10 +1267,10 @@ export const initialAssets: Asset[] = [
     currencySymbol: '$',
     purchaseDate: '2026-02-12',
     supplier: 'أجهزة وتجهيزات كهربائية',
-    invoiceRef: 'EXP-2026-058',
+    invoiceRef: 'EXP-2026-056',
     status: 'active',
     description: 'براد ومبرد مياه بارد/ساخن لخدمة العاملين والزبائن في المحل (قيمة: 50$)',
-    notes: 'سند صرف رقم EXP-2026-058 - تم الدفع بواسطة: نور (50$)',
+    notes: 'سند صرف رقم EXP-2026-056 - تم الدفع بواسطة: نور (50$)',
     createdAt: '2026-02-12'
   }
 ];
@@ -1629,6 +1590,7 @@ export const initialProducts: Product[] = [
     quantity: 1,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد)',
     createdAt: '2026-02-12'
   },
@@ -1644,6 +1606,7 @@ export const initialProducts: Product[] = [
     quantity: 4,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 4.4$',
     createdAt: '2026-02-12'
   },
@@ -1659,6 +1622,7 @@ export const initialProducts: Product[] = [
     quantity: 1,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد)',
     createdAt: '2026-02-12'
   },
@@ -1674,6 +1638,7 @@ export const initialProducts: Product[] = [
     quantity: 1,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000340 من ليزر رسلان (سدده الشريك أمجد)',
     createdAt: '2026-02-12'
   },
@@ -1689,6 +1654,7 @@ export const initialProducts: Product[] = [
     quantity: 2,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 4.5$',
     createdAt: '2026-02-12'
   },
@@ -1704,6 +1670,7 @@ export const initialProducts: Product[] = [
     quantity: 7,
     minQuantityAlert: 2,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 7.7$',
     createdAt: '2026-02-12'
   },
@@ -1719,6 +1686,7 @@ export const initialProducts: Product[] = [
     quantity: 2,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 2.7$',
     createdAt: '2026-02-12'
   },
@@ -1734,6 +1702,7 @@ export const initialProducts: Product[] = [
     quantity: 2,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 1.4$',
     createdAt: '2026-02-12'
   },
@@ -1749,6 +1718,7 @@ export const initialProducts: Product[] = [
     quantity: 1,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد)',
     createdAt: '2026-02-12'
   },
@@ -1764,6 +1734,7 @@ export const initialProducts: Product[] = [
     quantity: 2,
     minQuantityAlert: 1,
     unit: 'لوح',
+    paidBy: 'amjad',
     notes: 'إذن تسليم رقم 000341 من ليزر رسلان (سدده الشريك أمجد) - إجمالي 2.4$',
     createdAt: '2026-02-12'
   }

@@ -3,7 +3,7 @@ import { useAccounting } from '../context/AccountingContext';
 import type { Currency, ExpensePayer, ExpenseBill } from '../types/accounting';
 
 export const ExpensesView: React.FC = () => {
-  const { expenses, accounts, contacts, addExpense, updateExpense, deleteExpense, addContact, addAccount, addAsset } = useAccounting();
+  const { expenses, products, accounts, contacts, addExpense, updateExpense, deleteExpense, addContact, addAccount, addAsset } = useAccounting();
 
   // Sub-pages / Tabs
   const [activeTab, setActiveTab] = useState<'all' | 'abc' | 'amjad' | 'nour' | 'reconciliation'>('all');
@@ -312,6 +312,27 @@ export const ExpensesView: React.FC = () => {
   const nourUnifiedUSD = nourExpenses.reduce((s, e) => s + getUnifiedUSD(e), 0);
   const nourUnifiedSYP = nourExpenses.reduce((s, e) => s + getUnifiedSYP(e), 0);
 
+  // Products stock cost calculation per payer
+  const amjadProductsUSD = products
+    .filter(p => p.currency === 'USD' && p.paidBy === 'amjad')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+
+  const nourProductsUSD = products
+    .filter(p => p.currency === 'USD' && p.paidBy === 'nour')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+
+  const abcProductsUSD = products
+    .filter(p => p.currency === 'USD' && (p.paidBy || 'abc') === 'abc')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+
+  const totalProductsUSD = amjadProductsUSD + nourProductsUSD + abcProductsUSD;
+
+  // Grand Totals: Unified Expenses & Capital Assets + Products Inventory
+  const amjadGrandTotalUSD = amjadUnifiedUSD + amjadProductsUSD;
+  const nourGrandTotalUSD = nourUnifiedUSD + nourProductsUSD;
+  const abcGrandTotalUSD = abcUnifiedUSD + abcProductsUSD;
+  const grandTotalAllUSD = totalUnifiedUSD + totalProductsUSD;
+
   // Active table list with Sorting
   const rawList = activeTab === 'abc' 
     ? abcExpenses 
@@ -610,19 +631,19 @@ export const ExpensesView: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="stat-title" style={{ fontWeight: 800, color: '#1d4ed8' }}>👤 مصاريف أمجد</span>
-            <span style={{ fontSize: '0.75rem', color: '#2563eb' }}>{amjadExpenses.length} سند</span>
+            <span className="stat-title" style={{ fontWeight: 800, color: '#1d4ed8' }}>👤 مدفوعات أمجد (الشاملة)</span>
+            <span style={{ fontSize: '0.75rem', color: '#2563eb' }}>{amjadExpenses.length} سند + {products.filter(p => p.paidBy === 'amjad').length} بضائع</span>
           </div>
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المجموع الموحد:</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الإجمالي الشامل (مصروفات + بضاعة):</span>
               <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#2563eb' }}>
-                $ {Math.round(amjadUnifiedUSD).toLocaleString()}
+                $ {Math.round(amjadGrandTotalUSD).toLocaleString()}
               </span>
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem' }}>
-              <span>بالدولار: <strong>$ {amjadUSD.toLocaleString()}</strong></span>
-              <span>بالسوري: <strong>{amjadSYP.toLocaleString()} ل.س</strong> <span style={{ color: '#16a34a' }}>($ {Math.round(amjadSYP / 130).toLocaleString()})</span></span>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem', flexWrap: 'wrap', gap: '0.25rem' }}>
+              <span>مصروفات وأصول: <strong>$ {Math.round(amjadUnifiedUSD).toLocaleString()}</strong></span>
+              <span>بضاعة المخزن: <strong style={{ color: '#2563eb' }}>$ {amjadProductsUSD.toFixed(1)}</strong></span>
             </div>
           </div>
         </div>
@@ -639,19 +660,19 @@ export const ExpensesView: React.FC = () => {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="stat-title" style={{ fontWeight: 800, color: '#15803d' }}>👤 مصاريف نور</span>
-            <span style={{ fontSize: '0.75rem', color: '#16a34a' }}>{nourExpenses.length} سند</span>
+            <span className="stat-title" style={{ fontWeight: 800, color: '#15803d' }}>👤 مدفوعات نور (الشاملة)</span>
+            <span style={{ fontSize: '0.75rem', color: '#16a34a' }}>{nourExpenses.length} سند + {products.filter(p => p.paidBy === 'nour').length} بضائع</span>
           </div>
           <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المجموع الموحد:</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الإجمالي الشامل (مصروفات + بضاعة):</span>
               <span style={{ fontSize: '1.25rem', fontWeight: 900, color: '#16a34a' }}>
-                $ {Math.round(nourUnifiedUSD).toLocaleString()}
+                $ {Math.round(nourGrandTotalUSD).toLocaleString()}
               </span>
             </div>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem' }}>
-              <span>بالدولار: <strong>$ {nourUSD.toLocaleString()}</strong></span>
-              <span>بالسوري: <strong>{nourSYP.toLocaleString()} ل.س</strong></span>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '0.3rem', flexWrap: 'wrap', gap: '0.25rem' }}>
+              <span>مصروفات وأصول: <strong>$ {Math.round(nourUnifiedUSD).toLocaleString()}</strong></span>
+              <span>بضاعة المخزن: <strong style={{ color: '#16a34a' }}>$ {nourProductsUSD.toFixed(1)}</strong></span>
             </div>
           </div>
         </div>
@@ -932,6 +953,173 @@ export const ExpensesView: React.FC = () => {
                   <div style={{ width: `${(abcSYP / totalSYP) * 100}%`, backgroundColor: '#64748b' }} title={`شركة ABC: ${abcSYP} ل.س`} />
                   <div style={{ width: `${(amjadSYP / totalSYP) * 100}%`, backgroundColor: '#2563eb' }} title={`أمجد: ${amjadSYP} ل.س`} />
                   <div style={{ width: `${(nourSYP / totalSYP) * 100}%`, backgroundColor: '#16a34a' }} title={`نور: ${nourSYP} ل.س`} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Grand Reconciliation Table (Expenses & Assets + Products Inventory) */}
+          <div style={{ marginTop: '2rem', borderTop: '2px solid #cbd5e1', paddingTop: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span>🌟</span> كشف التسوية الإجمالية الشاملة (المصروفات والتجهيزات + بضائع المخزون)
+                </h3>
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  تجميع كامل المدفوعات من نفقات تشغيلية وأصول ثابتة ومشتريات بضائع المخزن لحساب المستحقات النهائية
+                </p>
+              </div>
+            </div>
+
+            <div className="table-responsive" style={{ marginBottom: '1rem' }}>
+              <table>
+                <thead>
+                  <tr style={{ backgroundColor: '#f1f5f9' }}>
+                    <th>الطرف / الشريك</th>
+                    <th style={{ textAlign: 'left' }}>المصروفات والتجهيزات ($)</th>
+                    <th style={{ textAlign: 'left' }}>بضائع المخزن ($)</th>
+                    <th style={{ textAlign: 'left', backgroundColor: '#dbeafe', color: '#1e40af', fontSize: '0.95rem' }}>⭐ إجمالي المدفوعات الكلي ($)</th>
+                    <th style={{ textAlign: 'center', backgroundColor: '#e0f2fe', color: '#0369a1' }}>النسبة الشاملة %</th>
+                    <th>وضع التسوية والاستحقاق</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* ABC Fund */}
+                  <tr>
+                    <td style={{ fontWeight: 800 }}>🏢 شركة ABC (الصندوق المباشر)</td>
+                    <td style={{ textAlign: 'left', fontWeight: 700, color: '#475569' }}>
+                      $ {abcUnifiedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', fontWeight: 700, color: '#475569' }}>
+                      $ {abcProductsUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', fontWeight: 900, color: '#1e293b', backgroundColor: '#f8fafc' }}>
+                      $ {abcGrandTotalUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 800, color: '#475569' }}>
+                      {grandTotalAllUSD > 0 ? ((abcGrandTotalUSD / grandTotalAllUSD) * 100).toFixed(1) : 0} %
+                    </td>
+                    <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>أموال وخزينة المنشأة</td>
+                  </tr>
+
+                  {/* Amjad */}
+                  <tr style={{ backgroundColor: '#eff6ff' }}>
+                    <td style={{ fontWeight: 800, color: '#1d4ed8' }}>👤 الشريك أمجد</td>
+                    <td style={{ textAlign: 'left', fontWeight: 700, color: '#1d4ed8' }}>
+                      $ {amjadUnifiedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', fontWeight: 800, color: '#2563eb' }}>
+                      $ {amjadProductsUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', fontWeight: 900, color: '#1e40af', backgroundColor: '#dbeafe' }}>
+                      $ {amjadGrandTotalUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 900, color: '#1d4ed8', backgroundColor: '#dbeafe' }}>
+                      {grandTotalAllUSD > 0 ? ((amjadGrandTotalUSD / grandTotalAllUSD) * 100).toFixed(1) : 0} %
+                    </td>
+                    <td style={{ fontSize: '0.82rem', color: '#1d4ed8', fontWeight: 700 }}>
+                      مستحق لأمجد بذمة الشركة بالكامل
+                    </td>
+                  </tr>
+
+                  {/* Nour */}
+                  <tr style={{ backgroundColor: '#f0fdf4' }}>
+                    <td style={{ fontWeight: 800, color: '#15803d' }}>👤 الشريك نور</td>
+                    <td style={{ textAlign: 'left', fontWeight: 700, color: '#15803d' }}>
+                      $ {nourUnifiedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', fontWeight: 800, color: '#16a34a' }}>
+                      $ {nourProductsUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', fontWeight: 900, color: '#166534', backgroundColor: '#dcfce7' }}>
+                      $ {nourGrandTotalUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'center', fontWeight: 900, color: '#15803d', backgroundColor: '#dcfce7' }}>
+                      {grandTotalAllUSD > 0 ? ((nourGrandTotalUSD / grandTotalAllUSD) * 100).toFixed(1) : 0} %
+                    </td>
+                    <td style={{ fontSize: '0.82rem', color: '#15803d', fontWeight: 700 }}>
+                      مستحق لنور بذمة الشركة بالكامل
+                    </td>
+                  </tr>
+
+                  {/* Grand Total All */}
+                  <tr style={{ backgroundColor: '#e2e8f0', fontWeight: 900, borderTop: '2px solid #94a3b8' }}>
+                    <td>المجموع الإجمالي الكلي (الشركة + الشركاء)</td>
+                    <td style={{ textAlign: 'left', color: 'var(--primary-color)' }}>
+                      $ {totalUnifiedUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', color: 'var(--primary-color)' }}>
+                      $ {totalProductsUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'left', color: '#1e3a8a', backgroundColor: '#cbd5e1' }}>
+                      $ {grandTotalAllUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ textAlign: 'center', color: '#1e3a8a', backgroundColor: '#cbd5e1' }}>100 %</td>
+                    <td style={{ fontSize: '0.82rem' }}>إجمالي رأس المال والسيولة الموظفة</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Partner Difference Card */}
+            {(() => {
+              const partnerDiff = amjadGrandTotalUSD - nourGrandTotalUSD;
+              const absDiff = Math.abs(partnerDiff);
+              const whoPaidMore = partnerDiff > 0 ? 'أمجد' : partnerDiff < 0 ? 'نور' : 'متساويان';
+              return (
+                <div style={{ 
+                  padding: '1rem 1.25rem', 
+                  borderRadius: 'var(--radius-md)', 
+                  backgroundColor: whoPaidMore === 'أمجد' ? '#eff6ff' : whoPaidMore === 'نور' ? '#f0fdf4' : '#f8fafc',
+                  border: `1.5px solid ${whoPaidMore === 'أمجد' ? '#bfdbfe' : whoPaidMore === 'نور' ? '#bbf7d0' : '#e2e8f0'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: whoPaidMore === 'أمجد' ? '#1d4ed8' : whoPaidMore === 'نور' ? '#15803d' : '#334155' }}>
+                      ⚖️ نتيجة التسوية المباشرة بين الشريكين (أمجد ونور):
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-dark)', marginTop: '3px' }}>
+                      {whoPaidMore === 'متساويان' ? (
+                        'المبالغ المسددة من الشريكين متساوية تماماً!'
+                      ) : (
+                        <span>
+                          الشريك <strong>{whoPaidMore}</strong> دفع أكثر بمقدار: <strong style={{ color: whoPaidMore === 'أمجد' ? '#1d4ed8' : '#15803d' }}>$ {absDiff.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ 
+                    padding: '0.5rem 1rem', 
+                    borderRadius: '8px', 
+                    backgroundColor: 'white', 
+                    border: '1px solid #cbd5e1',
+                    fontWeight: 800,
+                    fontSize: '0.9rem',
+                    color: whoPaidMore === 'أمجد' ? '#1d4ed8' : whoPaidMore === 'نور' ? '#15803d' : '#334155'
+                  }}>
+                    فارق التسوية: $ {absDiff.toFixed(2)}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Grand Total Visual Bar */}
+            {grandTotalAllUSD > 0 && (
+              <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: 'white', borderRadius: 'var(--radius-sm)', border: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.4rem', fontWeight: 800 }}>
+                  <span style={{ color: '#1e3a8a' }}>📊 التوزيع الإجمالي الكلي لكافة مدفوعات المشروع (مصروفات + أصول + بضاعة):</span>
+                  <span>
+                    الشركة: {((abcGrandTotalUSD / grandTotalAllUSD) * 100).toFixed(1)}% | أمجد: {((amjadGrandTotalUSD / grandTotalAllUSD) * 100).toFixed(1)}% | نور: {((nourGrandTotalUSD / grandTotalAllUSD) * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div style={{ display: 'flex', height: '18px', borderRadius: '9px', overflow: 'hidden', backgroundColor: '#e2e8f0' }}>
+                  <div style={{ width: `${(abcGrandTotalUSD / grandTotalAllUSD) * 100}%`, backgroundColor: '#475569' }} title={`صندوق الشركة: $${abcGrandTotalUSD.toFixed(1)}`} />
+                  <div style={{ width: `${(amjadGrandTotalUSD / grandTotalAllUSD) * 100}%`, backgroundColor: '#2563eb' }} title={`أمجد: $${amjadGrandTotalUSD.toFixed(1)}`} />
+                  <div style={{ width: `${(nourGrandTotalUSD / grandTotalAllUSD) * 100}%`, backgroundColor: '#16a34a' }} title={`نور: $${nourGrandTotalUSD.toFixed(1)}`} />
                 </div>
               </div>
             )}

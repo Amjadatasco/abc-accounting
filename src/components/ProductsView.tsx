@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useAccounting } from '../context/AccountingContext';
-import type { Product, Currency } from '../types/accounting';
+import type { Product, Currency, ExpensePayer } from '../types/accounting';
 
 export const ProductsView: React.FC = () => {
-  const { products, addProduct, updateProduct, deleteProduct, adjustProductStock } = useAccounting();
+  const { products, addProduct, updateProduct, updateProductPayer, deleteProduct, adjustProductStock } = useAccounting();
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'in_stock' | 'low_stock' | 'out_of_stock'>('all');
   const [selectedCurrency, setSelectedCurrency] = useState<'all' | 'USD' | 'SYP'>('all');
+  const [selectedPayer, setSelectedPayer] = useState<'all' | 'amjad' | 'nour' | 'abc'>('all');
 
   // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -31,6 +32,7 @@ export const ProductsView: React.FC = () => {
   const [sellingPrice, setSellingPrice] = useState('');
   const [quantity, setQuantity] = useState('0');
   const [minQuantityAlert, setMinQuantityAlert] = useState('5');
+  const [paidBy, setPaidBy] = useState<ExpensePayer>('abc');
   const [notes, setNotes] = useState('');
 
   // Extract unique categories
@@ -51,6 +53,22 @@ export const ProductsView: React.FC = () => {
   const totalCostSYP = products
     .filter(p => p.currency === 'SYP')
     .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+
+  // Payer specific stock computations
+  const amjadProductsUSD = products
+    .filter(p => p.currency === 'USD' && p.paidBy === 'amjad')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+  const amjadProductsCount = products.filter(p => p.paidBy === 'amjad').length;
+
+  const nourProductsUSD = products
+    .filter(p => p.currency === 'USD' && p.paidBy === 'nour')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+  const nourProductsCount = products.filter(p => p.paidBy === 'nour').length;
+
+  const abcProductsUSD = products
+    .filter(p => p.currency === 'USD' && (p.paidBy || 'abc') === 'abc')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+  const abcProductsCount = products.filter(p => (p.paidBy || 'abc') === 'abc').length;
 
   const lowStockProducts = products.filter(p => {
     const q = Number(p.quantity) || 0;
@@ -73,13 +91,14 @@ export const ProductsView: React.FC = () => {
 
     const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
     const matchesCurrency = selectedCurrency === 'all' || p.currency === selectedCurrency;
+    const matchesPayer = selectedPayer === 'all' || (p.paidBy || 'abc') === selectedPayer;
 
     let matchesStatus = true;
     if (selectedStatus === 'in_stock') matchesStatus = q > min;
     else if (selectedStatus === 'low_stock') matchesStatus = q > 0 && q <= min;
     else if (selectedStatus === 'out_of_stock') matchesStatus = q <= 0;
 
-    return matchesSearch && matchesCategory && matchesCurrency && matchesStatus;
+    return matchesSearch && matchesCategory && matchesCurrency && matchesStatus && matchesPayer;
   });
 
   // Open modal for new product
@@ -94,6 +113,7 @@ export const ProductsView: React.FC = () => {
     setSellingPrice('');
     setQuantity('10');
     setMinQuantityAlert('5');
+    setPaidBy('abc');
     setNotes('');
     setIsProductModalOpen(true);
   };
@@ -110,6 +130,7 @@ export const ProductsView: React.FC = () => {
     setSellingPrice(String(p.sellingPrice || ''));
     setQuantity(String(p.quantity || '0'));
     setMinQuantityAlert(String(p.minQuantityAlert !== undefined ? p.minQuantityAlert : 5));
+    setPaidBy(p.paidBy || 'abc');
     setNotes(p.notes || '');
     setIsProductModalOpen(true);
   };
@@ -142,6 +163,7 @@ export const ProductsView: React.FC = () => {
         sellingPrice: sellNum,
         quantity: qtyNum,
         minQuantityAlert: minAlertNum,
+        paidBy,
         notes: notes.trim() || undefined,
       });
     } else {
@@ -156,6 +178,7 @@ export const ProductsView: React.FC = () => {
         sellingPrice: sellNum,
         quantity: qtyNum,
         minQuantityAlert: minAlertNum,
+        paidBy,
         notes: notes.trim() || undefined,
       });
     }
@@ -271,9 +294,153 @@ export const ProductsView: React.FC = () => {
         </div>
       </div>
 
+      {/* Payer Breakdown Section (من دفع للبضاعة؟) */}
+      <div className="table-card" style={{ padding: '1.25rem', marginBottom: '1.5rem', border: '1px solid #bfdbfe', backgroundColor: '#f8fafc' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>💳</span> مساهمات وتمويل شراء البضاعة (حساب كل طرف):
+            </h4>
+            <p style={{ margin: '4px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              تتبع مساهمة كل شريك وصندوق الشركة في تمويل شراء بضائع المخزن — مدمجة مباشرة مع كشوفات وتسوية الشركاء
+            </p>
+          </div>
+          {/* Filter buttons by payer */}
+          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+            <button 
+              type="button"
+              className={`btn btn-sm ${selectedPayer === 'all' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem' }}
+              onClick={() => setSelectedPayer('all')}
+            >
+              كافة البضائع ({products.length})
+            </button>
+            <button 
+              type="button"
+              className={`btn btn-sm ${selectedPayer === 'amjad' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem', borderColor: '#3b82f6', color: selectedPayer === 'amjad' ? 'white' : '#1d4ed8' }}
+              onClick={() => setSelectedPayer('amjad')}
+            >
+              👤 دفعها أمجد ({amjadProductsCount})
+            </button>
+            <button 
+              type="button"
+              className={`btn btn-sm ${selectedPayer === 'nour' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem', borderColor: '#22c55e', color: selectedPayer === 'nour' ? 'white' : '#15803d' }}
+              onClick={() => setSelectedPayer('nour')}
+            >
+              👤 دفعها نور ({nourProductsCount})
+            </button>
+            <button 
+              type="button"
+              className={`btn btn-sm ${selectedPayer === 'abc' ? 'btn-primary' : 'btn-outline'}`}
+              style={{ padding: '0.3rem 0.65rem', fontSize: '0.8rem', borderColor: '#64748b', color: selectedPayer === 'abc' ? 'white' : '#334155' }}
+              onClick={() => setSelectedPayer('abc')}
+            >
+              🏢 صندوق الشركة ({abcProductsCount})
+            </button>
+          </div>
+        </div>
+
+        {/* 3 Interactive Cards for Payers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+          {/* Amjad */}
+          <div 
+            onClick={() => setSelectedPayer(selectedPayer === 'amjad' ? 'all' : 'amjad')}
+            style={{ 
+              padding: '1rem', 
+              borderRadius: 'var(--radius-md)', 
+              border: selectedPayer === 'amjad' ? '2px solid #2563eb' : '1px solid #bfdbfe', 
+              backgroundColor: selectedPayer === 'amjad' ? '#eff6ff' : 'white',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span style={{ fontWeight: 800, color: '#1d4ed8', fontSize: '0.9rem' }}>👤 بضاعة دفعها أمجد</span>
+              <span className="badge badge-blue">{amjadProductsCount} صنف</span>
+            </div>
+            <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#1e40af' }}>
+              $ {amjadProductsUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '4px', fontWeight: 600 }}>
+              {totalCostUSD > 0 ? ((amjadProductsUSD / totalCostUSD) * 100).toFixed(1) : 0}% من إجمالي بضائع المخزن
+            </div>
+          </div>
+
+          {/* Nour */}
+          <div 
+            onClick={() => setSelectedPayer(selectedPayer === 'nour' ? 'all' : 'nour')}
+            style={{ 
+              padding: '1rem', 
+              borderRadius: 'var(--radius-md)', 
+              border: selectedPayer === 'nour' ? '2px solid #16a34a' : '1px solid #bbf7d0', 
+              backgroundColor: selectedPayer === 'nour' ? '#f0fdf4' : 'white',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span style={{ fontWeight: 800, color: '#15803d', fontSize: '0.9rem' }}>👤 بضاعة دفعها نور</span>
+              <span className="badge badge-green">{nourProductsCount} صنف</span>
+            </div>
+            <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#166534' }}>
+              $ {nourProductsUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#16a34a', marginTop: '4px', fontWeight: 600 }}>
+              {totalCostUSD > 0 ? ((nourProductsUSD / totalCostUSD) * 100).toFixed(1) : 0}% من إجمالي بضائع المخزن
+            </div>
+          </div>
+
+          {/* ABC Company Fund */}
+          <div 
+            onClick={() => setSelectedPayer(selectedPayer === 'abc' ? 'all' : 'abc')}
+            style={{ 
+              padding: '1rem', 
+              borderRadius: 'var(--radius-md)', 
+              border: selectedPayer === 'abc' ? '2px solid #475569' : '1px solid #cbd5e1', 
+              backgroundColor: selectedPayer === 'abc' ? '#f1f5f9' : 'white',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+              <span style={{ fontWeight: 800, color: '#334155', fontSize: '0.9rem' }}>🏢 صندوق الشركة المباشر</span>
+              <span className="badge" style={{ backgroundColor: '#e2e8f0', color: '#475569' }}>{abcProductsCount} صنف</span>
+            </div>
+            <div style={{ fontSize: '1.45rem', fontWeight: 900, color: '#1e293b' }}>
+              $ {abcProductsUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px', fontWeight: 600 }}>
+              {totalCostUSD > 0 ? ((abcProductsUSD / totalCostUSD) * 100).toFixed(1) : 0}% من إجمالي بضائع المخزن
+            </div>
+          </div>
+        </div>
+
+        {/* Visual ratio bar */}
+        {totalCostUSD > 0 && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.3rem', color: 'var(--text-muted)', fontWeight: 700 }}>
+              <span>نسب تمويل المخزون:</span>
+              <span>
+                أمجد: {((amjadProductsUSD / totalCostUSD) * 100).toFixed(1)}% | نور: {((nourProductsUSD / totalCostUSD) * 100).toFixed(1)}% | صندوق الشركة: {((abcProductsUSD / totalCostUSD) * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div style={{ display: 'flex', height: '10px', borderRadius: '5px', overflow: 'hidden', backgroundColor: '#e2e8f0' }}>
+              <div style={{ width: `${(amjadProductsUSD / totalCostUSD) * 100}%`, backgroundColor: '#2563eb' }} title={`أمجد: $${amjadProductsUSD.toFixed(1)}`} />
+              <div style={{ width: `${(nourProductsUSD / totalCostUSD) * 100}%`, backgroundColor: '#16a34a' }} title={`نور: $${nourProductsUSD.toFixed(1)}`} />
+              <div style={{ width: `${(abcProductsUSD / totalCostUSD) * 100}%`, backgroundColor: '#64748b' }} title={`صندوق الشركة: $${abcProductsUSD.toFixed(1)}`} />
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Filter and Search Bar */}
       <div className="table-card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', alignItems: 'center' }}>
           
           {/* Search Input */}
           <div className="form-group" style={{ margin: 0 }}>
@@ -299,6 +466,21 @@ export const ProductsView: React.FC = () => {
               {allCategoryOptions.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Payer Filter */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label" style={{ fontSize: '0.8rem', fontWeight: 700 }}>💳 من دفع للبضاعة؟</label>
+            <select 
+              className="form-select"
+              value={selectedPayer}
+              onChange={(e) => setSelectedPayer(e.target.value as any)}
+            >
+              <option value="all">كافة الممولين</option>
+              <option value="amjad">👤 دفعها أمجد ({amjadProductsCount})</option>
+              <option value="nour">👤 دفعها نور ({nourProductsCount})</option>
+              <option value="abc">🏢 صندوق الشركة ({abcProductsCount})</option>
             </select>
           </div>
 
@@ -361,6 +543,7 @@ export const ProductsView: React.FC = () => {
                   <th>كود البضاعة</th>
                   <th>اسم البضاعة / الصنف</th>
                   <th>التصنيف</th>
+                  <th>من دفع للبضاعة؟</th>
                   <th>الكمية بالمخزن</th>
                   <th>سعر التكلفة</th>
                   <th>سعر البيع</th>
@@ -400,6 +583,30 @@ export const ProductsView: React.FC = () => {
                         <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
                           {p.category}
                         </span>
+                      </td>
+                      <td>
+                        <select
+                          className="form-select"
+                          style={{
+                            padding: '0.2rem 0.45rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            borderRadius: '6px',
+                            width: 'auto',
+                            minWidth: '115px',
+                            border: `1.5px solid ${(p.paidBy || 'abc') === 'amjad' ? '#93c5fd' : (p.paidBy || 'abc') === 'nour' ? '#86efac' : '#cbd5e1'}`,
+                            backgroundColor: (p.paidBy || 'abc') === 'amjad' ? '#eff6ff' : (p.paidBy || 'abc') === 'nour' ? '#f0fdf4' : '#f8fafc',
+                            color: (p.paidBy || 'abc') === 'amjad' ? '#1d4ed8' : (p.paidBy || 'abc') === 'nour' ? '#15803d' : '#334155',
+                            cursor: 'pointer'
+                          }}
+                          value={p.paidBy || 'abc'}
+                          onChange={(e) => updateProductPayer(p.id, e.target.value as ExpensePayer)}
+                          title="تغيير الجهة التي دفعت ثمن هذه البضاعة فورياً"
+                        >
+                          <option value="abc">🏢 صندوق الشركة</option>
+                          <option value="amjad">👤 الشريك أمجد</option>
+                          <option value="nour">👤 الشريك نور</option>
+                        </select>
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -626,6 +833,66 @@ export const ProductsView: React.FC = () => {
                       value={minQuantityAlert}
                       onChange={(e) => setMinQuantityAlert(e.target.value)}
                     />
+                  </div>
+                </div>
+
+                {/* Who paid for this product */}
+                <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                  <label className="form-label" style={{ fontWeight: 800 }}>💳 من دفع تكلفة شراء هذه البضاعة؟ *</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                    {/* Option ABC */}
+                    <div 
+                      onClick={() => setPaidBy('abc')}
+                      style={{
+                        padding: '0.65rem 0.5rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        border: paidBy === 'abc' ? '2px solid #475569' : '1px solid var(--border-color)',
+                        backgroundColor: paidBy === 'abc' ? '#f1f5f9' : 'white',
+                        textAlign: 'center',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <div style={{ fontSize: '1.2rem', marginBottom: '2px' }}>🏢</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#334155' }}>صندوق الشركة</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>خزينة ABC المباشرة</div>
+                    </div>
+
+                    {/* Option Amjad */}
+                    <div 
+                      onClick={() => setPaidBy('amjad')}
+                      style={{
+                        padding: '0.65rem 0.5rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        border: paidBy === 'amjad' ? '2px solid #2563eb' : '1px solid var(--border-color)',
+                        backgroundColor: paidBy === 'amjad' ? '#eff6ff' : 'white',
+                        textAlign: 'center',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <div style={{ fontSize: '1.2rem', marginBottom: '2px' }}>👤</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#1d4ed8' }}>الشريك أمجد</div>
+                      <div style={{ fontSize: '0.7rem', color: '#2563eb' }}>دفعه من حسابه الخاص</div>
+                    </div>
+
+                    {/* Option Nour */}
+                    <div 
+                      onClick={() => setPaidBy('nour')}
+                      style={{
+                        padding: '0.65rem 0.5rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        border: paidBy === 'nour' ? '2px solid #16a34a' : '1px solid var(--border-color)',
+                        backgroundColor: paidBy === 'nour' ? '#f0fdf4' : 'white',
+                        textAlign: 'center',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <div style={{ fontSize: '1.2rem', marginBottom: '2px' }}>👤</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#15803d' }}>الشريك نور</div>
+                      <div style={{ fontSize: '0.7rem', color: '#16a34a' }}>دفعه من حسابه الخاص</div>
+                    </div>
                   </div>
                 </div>
 

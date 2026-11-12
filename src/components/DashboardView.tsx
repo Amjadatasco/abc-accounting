@@ -13,7 +13,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenNewInvoice, 
   onOpenNewJournal 
 }) => {
-  const { metrics, invoices, expenses, journalEntries, companySettings, markInvoicePaid } = useAccounting();
+  const { metrics, invoices, expenses, products, journalEntries, companySettings, markInvoicePaid } = useAccounting();
   const curr = companySettings.currencySymbol || '$';
 
   const unpaidInvoices = invoices.filter(inv => inv.status !== 'paid');
@@ -48,7 +48,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     .filter(exp => (exp.currency || 'USD') === 'SYP')
     .reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0);
 
-  const amjadTotalUSD = expenses
+  const amjadExpensesUSD = expenses
     .filter(exp => exp.paidBy === 'amjad')
     .reduce((sum, exp) => {
       if ((exp.currency || 'USD') === 'USD') return sum + (Number(exp.amount) || 0);
@@ -56,13 +56,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return sum + (rate > 0 ? (Number(exp.amount) || 0) / rate : 0);
     }, 0);
 
-  const nourTotalUSD = expenses
+  const nourExpensesUSD = expenses
     .filter(exp => exp.paidBy === 'nour')
     .reduce((sum, exp) => {
       if ((exp.currency || 'USD') === 'USD') return sum + (Number(exp.amount) || 0);
       const rate = exp.exchangeRate || 130;
       return sum + (rate > 0 ? (Number(exp.amount) || 0) / rate : 0);
     }, 0);
+
+  const amjadProductsUSD = products
+    .filter(p => p.currency === 'USD' && p.paidBy === 'amjad')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+
+  const nourProductsUSD = products
+    .filter(p => p.currency === 'USD' && p.paidBy === 'nour')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+
+  const amjadGrandTotalUSD = amjadExpensesUSD + amjadProductsUSD;
+  const nourGrandTotalUSD = nourExpensesUSD + nourProductsUSD;
 
   const netProfit = actualRevenueUnifiedUSD - actualExpensesUSD;
 
@@ -125,26 +136,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="stat-card" style={{ borderRight: '4px solid #2563eb' }}>
           <div className="stat-header">
             <span className="stat-title">👤 مستحقات الشريك أمجد</span>
-            <span className="badge badge-blue">مصاريف مدفوعة</span>
+            <span className="badge badge-blue">إجمالي المدفوعات</span>
           </div>
           <div className="stat-value" style={{ color: '#2563eb' }}>
-            {curr} {Math.round(amjadTotalUSD).toLocaleString()}
+            {curr} {Math.round(amjadGrandTotalUSD).toLocaleString()}
           </div>
           <div className="stat-footer">
-            <span>6,200 $ + 123,950 ل.س (953 $)</span>
+            <span>مصروفات: {curr} {Math.round(amjadExpensesUSD).toLocaleString()} | بضاعة: {curr} {amjadProductsUSD.toFixed(1)}</span>
           </div>
         </div>
 
         <div className="stat-card" style={{ borderRight: '4px solid #16a34a' }}>
           <div className="stat-header">
             <span className="stat-title">👤 مستحقات الشريك نور</span>
-            <span className="badge" style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>مصاريف مدفوعة</span>
+            <span className="badge" style={{ backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }}>إجمالي المدفوعات</span>
           </div>
           <div className="stat-value" style={{ color: '#16a34a' }}>
-            {curr} {Math.round(nourTotalUSD).toLocaleString()}
+            {curr} {Math.round(nourGrandTotalUSD).toLocaleString()}
           </div>
           <div className="stat-footer">
-            <span>ماكينات + تجهيز المحل</span>
+            <span>مصروفات: {curr} {Math.round(nourExpensesUSD).toLocaleString()} | بضاعة: {curr} {nourProductsUSD.toFixed(1)}</span>
           </div>
         </div>
       </div>

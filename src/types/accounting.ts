@@ -150,6 +150,8 @@ export interface InvoiceItem {
   assetId?: string;
 }
 
+export type ExpensePayer = 'abc' | 'amjad' | 'nour';
+
 export interface Product {
   id: string;
   name: string;
@@ -162,6 +164,7 @@ export interface Product {
   quantity: number; // Current stock available
   minQuantityAlert?: number; // Low stock threshold
   unit?: string; // قطعة, كرتونة, رول, متر, إلخ
+  paidBy?: ExpensePayer; // 'abc' (صندوق الشركة) | 'amjad' (أمجد) | 'nour' (نور)
   notes?: string;
   createdAt: string;
   updatedAt?: string;
@@ -196,8 +199,6 @@ export interface Invoice {
   externalStatus?: 'paid' | 'unpaid';
   createdAt: string;
 }
-
-export type ExpensePayer = 'abc' | 'amjad' | 'nour';
 
 export interface ExpenseBill {
   id: string;
