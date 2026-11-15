@@ -167,6 +167,11 @@ export interface Product {
   unit?: string; // قطعة, كرتونة, رول, متر, إلخ
   paidBy?: ExpensePayer; // 'abc' (صندوق الشركة) | 'amjad' (أمجد) | 'nour' (نور)
   notes?: string;
+  supplier?: string; // اسم المورد / التاجر
+  purchaseInvoiceRef?: string; // رقم أو مرجع فاتورة الشراء
+  packageQuantity?: number; // عدد القطع في الكرتونة/العبوة
+  packagePrice?: number; // سعر شراء الكرتونة/العبوة
+  shippingCost?: number; // مصاريف الشحن والتوصيل المخصصة للقطعة
   createdAt: string;
   updatedAt?: string;
 }

@@ -75,6 +75,7 @@ interface AccountingContextType {
   updateContact: (contact: Contact) => void;
   deleteContact: (id: string) => void;
   addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => void;
+  addBatchProducts: (products: Omit<Product, 'id' | 'createdAt'>[]) => void;
   updateProduct: (product: Product) => void;
   updateProductPayer: (productId: string, paidBy: ExpensePayer) => void;
   deleteProduct: (id: string) => void;
@@ -998,6 +999,23 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
     setProducts(prev => {
       const updated = [newProduct, ...prev];
+      syncProductsToCloud(updated);
+      return updated;
+    });
+  };
+
+  const addBatchProducts = (newProds: Omit<Product, 'id' | 'createdAt'>[]) => {
+    if (!newProds.length) return;
+    const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
+    const createdProds: Product[] = newProds.map((p, idx) => ({
+      ...p,
+      id: `prd_${now}_${idx}`,
+      createdAt: today,
+      updatedAt: new Date().toISOString()
+    }));
+    setProducts(prev => {
+      const updated = [...createdProds, ...prev];
       syncProductsToCloud(updated);
       return updated;
     });
@@ -1953,6 +1971,7 @@ export const AccountingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       updateContact,
       deleteContact,
       addProduct,
+      addBatchProducts,
       updateProduct,
       updateProductPayer,
       deleteProduct,

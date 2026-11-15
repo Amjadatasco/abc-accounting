@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useAccounting } from '../context/AccountingContext';
 import type { Product, Currency, ExpensePayer } from '../types/accounting';
+import { LandedCostCalculatorModal } from './LandedCostCalculatorModal';
+import { BatchProductModal } from './BatchProductModal';
 
 export const ProductsView: React.FC = () => {
-  const { products, addProduct, updateProduct, updateProductPayer, deleteProduct, adjustProductStock } = useAccounting();
+  const { products, addProduct, addBatchProducts, updateProduct, updateProductPayer, deleteProduct, adjustProductStock } = useAccounting();
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,6 +44,22 @@ export const ProductsView: React.FC = () => {
   const defaultCategories = ['ألواح بلكسي وروماك ومواد خام', 'مواد طباعة وبودرة', 'أعلام وسواري', 'دروع تكريمية وكرستال', 'ستاندات وإعلانات', 'دفاتر ومطبوعات', 'بضائع عامة'];
   const allCategoryOptions = Array.from(new Set([...defaultCategories, ...categories]));
 
+  // Landed Cost & Pricing Assistant Modal State
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  // Batch Multi-Product Invoice Purchase Modal State
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+
+  // Single Product Modal Landed Cost Helper State
+  const [showLandedCostHelper, setShowLandedCostHelper] = useState(false);
+  const [helperPackageUnits, setHelperPackageUnits] = useState('');
+  const [helperPackageCost, setHelperPackageCost] = useState('');
+  const [helperShippingCost, setHelperShippingCost] = useState('');
+
+  // Quick Inline Edit Mode in Table
+  const [isQuickEditMode, setIsQuickEditMode] = useState(false);
+  const [inlineEdits, setInlineEdits] = useState<{ [id: string]: { costPrice: string; sellingPrice: string; quantity: string } }>({});
+
   // KPI Computations
   const totalItemsCount = products.length;
   const totalStockUnits = products.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0);
@@ -53,6 +71,13 @@ export const ProductsView: React.FC = () => {
   const totalCostSYP = products
     .filter(p => p.currency === 'SYP')
     .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.costPrice) || 0)), 0);
+
+  // Total potential selling value & profit
+  const totalPotentialRevenueUSD = products
+    .filter(p => p.currency === 'USD')
+    .reduce((sum, p) => sum + ((Number(p.quantity) || 0) * (Number(p.sellingPrice) || 0)), 0);
+
+  const totalPotentialProfitUSD = totalPotentialRevenueUSD - totalCostUSD;
 
   // Payer specific stock computations
   const amjadProductsUSD = products
@@ -215,6 +240,37 @@ export const ProductsView: React.FC = () => {
     }
   };
 
+  // --- Quick Inline Table Editing Handlers ---
+  const handleInlineFieldChange = (id: string, field: 'costPrice' | 'sellingPrice' | 'quantity', val: string, p: Product) => {
+    setInlineEdits(prev => ({
+      ...prev,
+      [id]: {
+        costPrice: field === 'costPrice' ? val : (prev[id]?.costPrice ?? String(p.costPrice)),
+        sellingPrice: field === 'sellingPrice' ? val : (prev[id]?.sellingPrice ?? String(p.sellingPrice)),
+        quantity: field === 'quantity' ? val : (prev[id]?.quantity ?? String(p.quantity)),
+      }
+    }));
+  };
+
+  const handleSaveInlineEdit = (p: Product) => {
+    const edit = inlineEdits[p.id];
+    if (!edit) return;
+    const cost = parseFloat(edit.costPrice);
+    const sell = parseFloat(edit.sellingPrice);
+    const qty = parseFloat(edit.quantity);
+    updateProduct({
+      ...p,
+      costPrice: !isNaN(cost) && cost >= 0 ? cost : p.costPrice,
+      sellingPrice: !isNaN(sell) && sell >= 0 ? sell : p.sellingPrice,
+      quantity: !isNaN(qty) && qty >= 0 ? qty : p.quantity,
+    });
+    setInlineEdits(prev => {
+      const next = { ...prev };
+      delete next[p.id];
+      return next;
+    });
+  };
+
   return (
     <div>
       {/* Top Header */}
@@ -223,15 +279,47 @@ export const ProductsView: React.FC = () => {
           <h2>📦 إدارة البضائع والمنتجات (المخزون)</h2>
           <p>سجل البضائع والمواد المتوفرة بالمخزن مع التتبع التلقائي للكميات والمبيعات</p>
         </div>
-        <div className="header-actions">
-          <button className="btn btn-primary" onClick={handleOpenAddModal}>
-            <span>+</span> إضافة بضاعة جديدة
+        <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn" 
+            onClick={() => setIsCalculatorOpen(true)}
+            style={{ 
+              backgroundColor: '#eff6ff', 
+              color: '#1d4ed8', 
+              border: '1.5px solid #bfdbfe', 
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 1px 3px rgba(37,99,235,0.08)'
+            }}
+          >
+            <span>🧮</span> حاسبة التكلفة الواقفة والتسعير
+          </button>
+          <button 
+            className="btn" 
+            onClick={() => setIsBatchModalOpen(true)}
+            style={{ 
+              backgroundColor: '#ecfdf5', 
+              color: '#047857', 
+              border: '1.5px solid #a7f3d0', 
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              boxShadow: '0 1px 3px rgba(4,120,87,0.08)'
+            }}
+          >
+            <span>📑</span> تسجيل فاتورة بضاعة جديدة (إدخال متعدد)
+          </button>
+          <button className="btn btn-primary" onClick={handleOpenAddModal} style={{ fontWeight: 800 }}>
+            <span>+</span> إضافة صنف فردي
           </button>
         </div>
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="stats-grid">
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         <div className="stat-card" style={{ borderRight: '4px solid #3b82f6' }}>
           <div className="stat-header">
             <span className="stat-title">إجمالي أصناف البضائع</span>
@@ -260,6 +348,19 @@ export const ProductsView: React.FC = () => {
           </div>
           <div className="stat-footer">
             <span>قيمة البضاعة المخزنة بناءً على سعر الشراء</span>
+          </div>
+        </div>
+
+        <div className="stat-card" style={{ borderRight: '4px solid #8b5cf6' }}>
+          <div className="stat-header">
+            <span className="stat-title">الأرباح الكامنة بالمخزن</span>
+            <span className="badge" style={{ backgroundColor: '#f3e8ff', color: '#7e22ce', border: '1px solid #d8b4fe' }}>صافي الأرباح المتوقعة</span>
+          </div>
+          <div className="stat-value" style={{ color: '#7c3aed' }}>
+            $ {Math.round(totalPotentialProfitUSD).toLocaleString()}
+          </div>
+          <div className="stat-footer">
+            <span>عند بيع كامل المخزون الحالي (+{totalCostUSD > 0 ? Math.round((totalPotentialProfitUSD / totalCostUSD) * 100) : 0}% عائد)</span>
           </div>
         </div>
 
@@ -518,12 +619,22 @@ export const ProductsView: React.FC = () => {
 
       {/* Products Table Card */}
       <div className="table-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
-            قائمة البضائع المخزنة ({filteredProducts.length})
-          </h3>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            💡 عند بيع أي بضاعة من شاشة المبيعات، ستنقص الكمية من هنا تلقائياً!
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0 }}>
+              قائمة البضائع وتكاليفها المخزنة ({filteredProducts.length})
+            </h3>
+            <button
+              type="button"
+              className={`btn btn-sm ${isQuickEditMode ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setIsQuickEditMode(!isQuickEditMode)}
+              style={{ fontSize: '0.78rem', fontWeight: 800, padding: '0.3rem 0.75rem', borderRadius: '6px' }}
+            >
+              {isQuickEditMode ? '✓ إنهاء وضع التعديل السريع' : '⚡ وضع التعديل السريع للأسعار'}
+            </button>
+          </div>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            💡 عند بيع أي بضاعة من شاشة المبيعات، ستنقص الكمية وتُحسب أرباحها وتكاليفها فورياً!
           </span>
         </div>
 
@@ -532,7 +643,7 @@ export const ProductsView: React.FC = () => {
             <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📦</span>
             <h4>لا توجد بضائع مطابقة للبحث أو التصفية</h4>
             <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-              يمكنك إضافة أول بضاعة عبر النقر على زر "+ إضافة بضاعة جديدة" بالأعلى.
+              يمكنك إضافة أول بضاعة عبر النقر على زر "+ إضافة صنف فردي" أو "تسجيل فاتورة بضاعة جديدة" بالأعلى.
             </p>
           </div>
         ) : (
@@ -545,10 +656,10 @@ export const ProductsView: React.FC = () => {
                   <th>التصنيف</th>
                   <th>من دفع للبضاعة؟</th>
                   <th>الكمية بالمخزن</th>
-                  <th>سعر التكلفة</th>
-                  <th>سعر البيع</th>
-                  <th>هامش الربح</th>
-                  <th>قيمة المخزون</th>
+                  <th>الكلفة الواقفة (التكلفة)</th>
+                  <th>سعر البيع المقترح</th>
+                  <th>صافي الربح / الهامش</th>
+                  <th>إجمالي رأس المال المجمد</th>
                   <th style={{ textAlign: 'center' }}>إجراءات</th>
                 </tr>
               </thead>
@@ -565,17 +676,23 @@ export const ProductsView: React.FC = () => {
 
                   const isOut = q <= 0;
                   const isLow = q > 0 && q <= min;
+                  const hasInlineEdit = !!inlineEdits[p.id];
 
                   return (
-                    <tr key={p.id}>
+                    <tr key={p.id} style={{ backgroundColor: hasInlineEdit ? '#fefce8' : undefined }}>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                         {p.code || '—'}
                       </td>
                       <td>
                         <div style={{ fontWeight: 800, color: 'var(--text-dark)' }}>{p.name}</div>
                         {p.notes && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                             {p.notes}
+                          </div>
+                        )}
+                        {p.supplier && (
+                          <div style={{ fontSize: '0.7rem', color: '#0369a1', marginTop: '2px' }}>
+                            المورد: <strong>{p.supplier}</strong>
                           </div>
                         )}
                       </td>
@@ -609,48 +726,125 @@ export const ProductsView: React.FC = () => {
                         </select>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ 
-                            fontSize: '1rem', 
-                            fontWeight: 900, 
-                            color: isOut ? '#dc2626' : isLow ? '#d97706' : '#16a34a' 
-                          }}>
-                            {q.toLocaleString()}
-                          </span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {p.unit || 'قطعة'}
-                          </span>
-                          {isOut ? (
-                            <span className="badge badge-red" style={{ fontSize: '0.7rem' }}>نافد</span>
-                          ) : isLow ? (
-                            <span className="badge badge-orange" style={{ fontSize: '0.7rem' }}>منخفض</span>
-                          ) : null}
-                        </div>
+                        {isQuickEditMode ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              style={{ width: '70px', padding: '0.2rem 0.35rem', textAlign: 'center', fontWeight: 800, borderRadius: '4px', border: '1.5px solid #93c5fd' }}
+                              value={inlineEdits[p.id]?.quantity ?? p.quantity}
+                              onChange={(e) => handleInlineFieldChange(p.id, 'quantity', e.target.value, p)}
+                            />
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{p.unit || 'قطعة'}</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ 
+                              fontSize: '1rem', 
+                              fontWeight: 900, 
+                              color: isOut ? '#dc2626' : isLow ? '#d97706' : '#16a34a' 
+                            }}>
+                              {q.toLocaleString()}
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {p.unit || 'قطعة'}
+                            </span>
+                            {isOut ? (
+                              <span className="badge badge-red" style={{ fontSize: '0.7rem' }}>نافد</span>
+                            ) : isLow ? (
+                              <span className="badge badge-orange" style={{ fontSize: '0.7rem' }}>منخفض</span>
+                            ) : null}
+                          </div>
+                        )}
                       </td>
-                      <td style={{ fontWeight: 600 }}>
-                        {sym} {cost.toLocaleString()}
+                      <td>
+                        {isQuickEditMode ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{sym}</span>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              style={{ width: '75px', padding: '0.2rem 0.35rem', fontWeight: 800, borderRadius: '4px', border: '1.5px solid #fcd34d', backgroundColor: '#fffbeb' }}
+                              value={inlineEdits[p.id]?.costPrice ?? p.costPrice}
+                              onChange={(e) => handleInlineFieldChange(p.id, 'costPrice', e.target.value, p)}
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontWeight: 800, color: '#92400e' }}>
+                              {sym} {cost.toLocaleString()}
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                              للوحدة الواحدة
+                            </span>
+                          </div>
+                        )}
                       </td>
-                      <td style={{ fontWeight: 700, color: 'var(--primary-color)' }}>
-                        {sym} {sell.toLocaleString()}
+                      <td>
+                        {isQuickEditMode ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>{sym}</span>
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              style={{ width: '75px', padding: '0.2rem 0.35rem', fontWeight: 800, borderRadius: '4px', border: '1.5px solid #93c5fd', color: '#1d4ed8' }}
+                              value={inlineEdits[p.id]?.sellingPrice ?? p.sellingPrice}
+                              onChange={(e) => handleInlineFieldChange(p.id, 'sellingPrice', e.target.value, p)}
+                            />
+                          </div>
+                        ) : (
+                          <div>
+                            <div style={{ fontWeight: 800, color: 'var(--primary-color)' }}>
+                              {sym} {sell.toLocaleString()}
+                            </div>
+                            <span style={{ fontSize: '0.68rem', color: '#16a34a', fontWeight: 700 }}>
+                              ربح: +{sym} {profitUnit.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         {profitUnit > 0 ? (
-                          <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.85rem' }}>
-                            +{profitMargin}% ({sym} {profitUnit.toLocaleString()})
-                          </span>
+                          <div>
+                            <span style={{ color: '#16a34a', fontWeight: 800, fontSize: '0.85rem' }}>
+                              +{profitMargin}%
+                            </span>
+                            <div style={{ width: '100%', height: '4px', backgroundColor: '#e2e8f0', borderRadius: '2px', marginTop: '3px', overflow: 'hidden' }}>
+                              <div style={{ width: `${Math.min(100, profitMargin)}%`, height: '100%', backgroundColor: '#16a34a' }} />
+                            </div>
+                          </div>
                         ) : profitUnit < 0 ? (
-                          <span style={{ color: '#dc2626', fontWeight: 700, fontSize: '0.85rem' }}>
+                          <span style={{ color: '#dc2626', fontWeight: 800, fontSize: '0.85rem' }}>
                             خسارة ({sym} {profitUnit.toLocaleString()})
                           </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>0%</span>
                         )}
                       </td>
-                      <td style={{ fontWeight: 700, color: '#334155' }}>
-                        {sym} {totalVal.toLocaleString()}
+                      <td>
+                        <div style={{ fontWeight: 800, color: '#334155' }}>
+                          {sym} {totalVal.toLocaleString()}
+                        </div>
+                        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                          رأس مال مجمد
+                        </span>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', alignItems: 'center' }}>
+                          {hasInlineEdit && (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => handleSaveInlineEdit(p)}
+                              title="حفظ التعديل المباشر"
+                              style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', fontWeight: 900, backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+                            >
+                              ✓ حفظ
+                            </button>
+                          )}
+
                           {/* Quick Adjust Button */}
                           <button 
                             className="btn btn-sm btn-outline" 
@@ -780,9 +974,112 @@ export const ProductsView: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Landed Cost Helper Toggle */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowLandedCostHelper(!showLandedCostHelper)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#2563eb',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: 0
+                    }}
+                  >
+                    <span>🧮</span>
+                    <span>{showLandedCostHelper ? 'إخفاء مساعد حساب الكلفة بالكرتونة والشحن ▲' : 'مساعد حساب الكلفة الواقفة بالكرتونة والشحن (Landed Cost) ▼'}</span>
+                  </button>
+
+                  {showLandedCostHelper && (
+                    <div style={{
+                      marginTop: '0.5rem',
+                      padding: '0.75rem',
+                      backgroundColor: '#eff6ff',
+                      borderRadius: '8px',
+                      border: '1px solid #bfdbfe'
+                    }}>
+                      <div style={{ fontSize: '0.78rem', color: '#1e40af', fontWeight: 700, marginBottom: '0.5rem' }}>
+                        💡 أدخل بيانات الكرتونة / الشروة لحساب كلفة القطعة الواحدة بدقة:
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#1e40af' }}>عدد القطع بالكرتونة</label>
+                          <input 
+                            type="number" 
+                            step="any"
+                            placeholder="50" 
+                            className="form-input" 
+                            style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}
+                            value={helperPackageUnits}
+                            onChange={(e) => setHelperPackageUnits(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#1e40af' }}>سعر شراء الكرتونة ({currency === 'SYP' ? 'ل.س' : '$'})</label>
+                          <input 
+                            type="number" 
+                            step="any"
+                            placeholder="100" 
+                            className="form-input" 
+                            style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}
+                            value={helperPackageCost}
+                            onChange={(e) => setHelperPackageCost(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#b45309' }}>نصيبها من الشحن</label>
+                          <input 
+                            type="number" 
+                            step="any"
+                            placeholder="10" 
+                            className="form-input" 
+                            style={{ padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}
+                            value={helperShippingCost}
+                            onChange={(e) => setHelperShippingCost(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const units = parseFloat(helperPackageUnits) || 0;
+                        const pkgCost = parseFloat(helperPackageCost) || 0;
+                        const ship = parseFloat(helperShippingCost) || 0;
+                        const landedUnit = units > 0 ? ((pkgCost + ship) / units) : 0;
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#0369a1' }}>
+                              الكلفة الواقفة للقطعة = {currency === 'SYP' ? 'ل.س' : '$'} {landedUnit > 0 ? landedUnit.toFixed(2) : '0.00'}
+                            </div>
+                            <button
+                              type="button"
+                              disabled={landedUnit <= 0}
+                              onClick={() => {
+                                setCostPrice(String(Math.round(landedUnit * 100) / 100));
+                                if (units > 0 && (!quantity || quantity === '0')) {
+                                  setQuantity(String(units));
+                                }
+                              }}
+                              className="btn btn-outline"
+                              style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', fontWeight: 800, borderColor: '#3b82f6', color: '#1d4ed8' }}
+                            >
+                              ✓ اعتماد كتكلفة للقطعة
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">سعر التكلفة (سعر الشراء) *</label>
+                    <label className="form-label">سعر التكلفة (سعر الشراء / الواقفة) *</label>
                     <input 
                       type="number" 
                       step="any"
@@ -796,7 +1093,14 @@ export const ProductsView: React.FC = () => {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">سعر البيع الافتراضي للزبون *</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="form-label" style={{ marginBottom: 0 }}>سعر البيع الافتراضي للزبون *</label>
+                      {parseFloat(costPrice) > 0 && parseFloat(sellingPrice) > 0 && (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#16a34a' }}>
+                          هامش: +{Math.round(((parseFloat(sellingPrice) - parseFloat(costPrice)) / parseFloat(costPrice)) * 100)}%
+                        </span>
+                      )}
+                    </div>
                     <input 
                       type="number" 
                       step="any"
@@ -807,6 +1111,35 @@ export const ProductsView: React.FC = () => {
                       value={sellingPrice}
                       onChange={(e) => setSellingPrice(e.target.value)}
                     />
+                    
+                    {/* Instant Markup Presets */}
+                    {parseFloat(costPrice) > 0 && (
+                      <div style={{ display: 'flex', gap: '0.25rem', marginTop: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>تسعير سريع:</span>
+                        {[20, 30, 40, 50, 75, 100].map(m => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              const cost = parseFloat(costPrice) || 0;
+                              setSellingPrice(String(Math.round(cost * (1 + m / 100) * 100) / 100));
+                            }}
+                            style={{
+                              padding: '1px 5px',
+                              fontSize: '0.72rem',
+                              borderRadius: '4px',
+                              border: '1px solid #cbd5e1',
+                              backgroundColor: '#f8fafc',
+                              color: '#334155',
+                              cursor: 'pointer',
+                              fontWeight: 700
+                            }}
+                          >
+                            +{m}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1004,6 +1337,28 @@ export const ProductsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Standalone Landed Cost & Pricing Assistant Modal */}
+      <LandedCostCalculatorModal
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        categories={allCategoryOptions}
+        defaultCurrency={selectedCurrency !== 'all' ? selectedCurrency : 'USD'}
+        onSaveProduct={(productData) => {
+          addProduct(productData);
+        }}
+      />
+
+      {/* Multi-Item Batch Purchase Invoice Modal */}
+      <BatchProductModal
+        isOpen={isBatchModalOpen}
+        onClose={() => setIsBatchModalOpen(false)}
+        categories={allCategoryOptions}
+        defaultCurrency={selectedCurrency !== 'all' ? selectedCurrency : 'USD'}
+        onSaveBatch={(items) => {
+          addBatchProducts(items);
+        }}
+      />
 
     </div>
   );
